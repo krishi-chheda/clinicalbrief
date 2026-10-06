@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../supabase";
@@ -1221,25 +1221,25 @@ export default function ClinicalBriefApp() {
   useEffect(() => {
     if (token) {
       loadPatients();
-      loadAuditLogs();
       loadGovernanceStats();
     }
   }, [token]);
 
+  // Page-specific lists load when their page opens (fresh on every visit).
   useEffect(() => {
-    if (currentView === "admin" && token) {
-      loadImportRuns();
-    }
+    if (currentView === "admin" && token) loadImportRuns();
+    if (currentView === "audit" && token) loadAuditLogs();
   }, [currentView, token]);
 
   useEffect(() => {
     if (selectedPatient) {
       loadPatientDocuments(selectedPatient.patient_id);
-      loadRiskInfo(selectedPatient.patient_id);
-      loadPatientGraph(selectedPatient.patient_id);
-      loadComparisonData(selectedPatient.patient_id);
       loadCopilotConversations(selectedPatient.patient_id);
       loadPatientRecord(selectedPatient.patient_id);
+      lazyLoaded.current = {};
+      setGraphData(null);
+      setComparisonData(null);
+      setRiskInfo(null);
       setInsights(null);
       setSelectedDocument(null);
       setQaChat([]);
@@ -1247,6 +1247,22 @@ export default function ClinicalBriefApp() {
       setSelectedNode(null);
     }
   }, [selectedPatient]);
+
+  // Graph, comparison and risk load only when their tab or dashboard widget is on screen, once per patient.
+  const lazyLoaded = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const pid = selectedPatient?.patient_id;
+    if (!pid) return;
+    const widgetOn = (id: string) => layout.some(w => w.id === id && w.visible);
+    const items: [string, boolean, (patientId: string) => void][] = [
+      ["graph", activeTab === "graph" || widgetOn("knowledge_graph"), loadPatientGraph],
+      ["compare", activeTab === "compare" || widgetOn("note_compare"), loadComparisonData],
+      ["risk", widgetOn("risk"), loadRiskInfo],
+    ];
+    for (const [key, needed, load] of items) {
+      if (needed && lazyLoaded.current[key] !== pid) { lazyLoaded.current[key] = pid; load(pid); }
+    }
+  }, [selectedPatient, activeTab, layout]);
 
   useEffect(() => {
     if (selectedDocument) {
@@ -1577,7 +1593,6 @@ export default function ClinicalBriefApp() {
       if (res.ok) {
         const updatedEntity = await res.json();
         setInsights(prev => prev ? { ...prev, entities: prev.entities.map(e => e.entity_id === entityId ? updatedEntity : e) } : prev);
-        loadAuditLogs();
       } else if (res.status === 403) {
         alert("Your role does not permit reviewing AI output.");
       }

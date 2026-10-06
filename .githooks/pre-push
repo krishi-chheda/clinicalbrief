@@ -1,0 +1,30 @@
+#!/bin/sh
+# Pre-push gate (review R-03): the backend suite must pass on Postgres with the real migrations and RLS
+# applied, with nothing skipped, and the frontend must type-check.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Do not bypass with --no-verify: this is the guard against RLS privilege-escalation regressions.
+PY=${PYTHON:-"py -3.12"}
+root=$(git rev-parse --show-toplevel) || exit 1
+
+sh "$root/.githooks/check-secrets" || exit 1
+
+echo "[pre-push] backend tests on local Postgres (TEST_PG=1: migrations + RLS)"
+cd "$root/clinicalbrief-backend" || exit 1
+out=$(TEST_PG=1 $PY -m pytest tests -q -p no:cacheprovider 2>&1)
+status=$?
+summary=$(printf '%s\n' "$out" | grep -E "[0-9]+ (passed|failed|error)" | tail -1)
+if [ $status -ne 0 ]; then
+    printf '%s\n' "$out" | grep -E "^(FAILED|ERROR)" | head -20
+    echo "[pre-push] BLOCKED: backend tests failed ($summary)"
+    exit 1
+fi
+if printf '%s' "$summary" | grep -q "skipped"; then
+    echo "[pre-push] BLOCKED: tests were skipped ($summary); the RLS and schema-drift guards must run"
+    exit 1
+fi
+echo "[pre-push] $summary"
+
+echo "[pre-push] frontend type check"
+cd "$root/clinicalbrief-frontend" || exit 1
+npx tsc --noEmit || { echo "[pre-push] BLOCKED: TypeScript errors"; exit 1; }
+echo "[pre-push] OK"

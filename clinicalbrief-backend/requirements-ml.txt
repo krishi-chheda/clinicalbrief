@@ -1,0 +1,7 @@
+# Only needed when USE_MOCK_MODELS=false. Several GB; not required for the API or tests.
+-r requirements.txt
+transformers==4.46.3
+torch>=2.4
+faiss-cpu==1.13.2
+sentence-transformers>=3.0
+numpy<2

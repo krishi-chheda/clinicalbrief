@@ -1,0 +1,3 @@
+#!/bin/sh
+# Blocks commits that would include a secret (see check-secrets). Do not bypass with --no-verify.
+exec sh "$(git rev-parse --show-toplevel)/.githooks/check-secrets"

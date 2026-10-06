@@ -1,0 +1,12 @@
+# Runtime dependencies (what the deployed API needs) - Python 3.12. Tests: requirements-dev.txt
+fastapi==0.136.3
+uvicorn==0.49.0
+SQLAlchemy==2.0.49
+pydantic==2.13.4
+python-multipart==0.0.32
+psycopg[binary]==3.3.6
+PyJWT[crypto]==2.13.0
+python-dotenv==1.2.2
+fhir.resources==8.3.0   # validates exported bundles (R4B models)
+
+# Optional: transformer models (USE_MOCK_MODELS=false) -> requirements-ml.txt

@@ -1,0 +1,5 @@
+# Everything in requirements.txt plus the test tools (the pre-push hook runs them on a local Postgres via pgserver).
+-r requirements.txt
+pytest==9.1.1
+httpx==0.28.1
+pgserver==0.1.4

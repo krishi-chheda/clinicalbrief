@@ -1,0 +1,80 @@
+# Deploying ClinicalBrief
+
+Frontend on **Vercel**, API on **Render**, database and sign-in on the existing **Supabase** project (Sydney).
+Everything below is done by the project owner in their own accounts; no secret goes into git.
+
+```
+browser ──> Vercel (Next.js)  ──>  Render (FastAPI, Singapore)  ──>  Supabase Postgres + Auth (Sydney)
+                 └──────────── Supabase Auth (sign-in, publishable key only) ────────────┘
+```
+
+## 0. Before anything goes live (security)
+
+1. **Reset the Supabase database password** (Supabase → Project Settings → Database → Reset database password).
+   The current one was exposed earlier and must not be used for a public deployment. Put the new one in your
+   local `clinicalbrief-backend/.env` and, in step 2, in Render.
+2. **Roll the Supabase secret key** that was pasted in a chat earlier (Project Settings → API Keys). The app never
+   uses a secret key; rolling it just retires the exposed one.
+3. **Turn on leaked-password protection** if your plan has it (Authentication → Policies / Passwords).
+
+## 1. GitHub (public repository)
+
+1. Create an empty repository at <https://github.com/new>: name `clinicalbrief`, **Public**, no README, no
+   .gitignore, no licence (the project already has them).
+2. In the project folder:
+
+```bash
+git status                     # check: no .env, .env.local, *.db or uploads/ listed
+git add -A
+git commit -m "ClinicalBrief: clinical notes into a reviewed, searchable, FHIR-exportable record"
+git branch -M main
+git remote add origin https://github.com/krishi-chheda/clinicalbrief.git
+git push -u origin main
+```
+
+The commit runs the secret scan; the push also runs the Postgres test suite and the frontend type check
+(about a minute). Git asks you to sign in to GitHub the first time.
+
+## 2. Render (API)
+
+1. <https://dashboard.render.com> → **New** → **Blueprint** → connect the `clinicalbrief` repository.
+   Render reads `render.yaml`: a free Python web service in Singapore, root `clinicalbrief-backend`.
+2. Render asks for the three secrets:
+   - `DATABASE_URL`: Supabase → Connect → **Session pooler** URI, with the **new** password.
+   - `SUPABASE_URL`: `https://<project-ref>.supabase.co`
+   - `CORS_ORIGINS`: put `http://localhost:3000` for now; you replace it in step 4.
+   - Only if your Supabase project still uses the legacy shared JWT secret: add `JWT_SECRET` too (most new projects
+     use signing keys, which the API fetches itself).
+3. Wait for the deploy, then open `https://<service>.onrender.com/`. It should return `"status": "online"`.
+
+## 3. Vercel (frontend)
+
+1. <https://vercel.com/new> → import the `clinicalbrief` repository.
+2. **Root Directory**: `clinicalbrief-frontend` (framework: Next.js, detected automatically).
+3. Environment variables (all public values; never a secret key):
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://<project-ref>.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = the `sb_publishable_…` key
+   - `NEXT_PUBLIC_API_URL` = `https://<service>.onrender.com`
+4. Deploy. Note the URL, e.g. `https://clinicalbrief.vercel.app`.
+
+## 4. Connect them
+
+1. **Render** → the service → Environment → set `CORS_ORIGINS` to the Vercel URL (no trailing slash). Render redeploys.
+2. **Supabase** → Authentication → URL Configuration: **Site URL** = the Vercel URL; add it to **Redirect URLs**.
+
+## 5. Check it
+
+- Open the Vercel URL: the landing page and public pages load without signing in.
+- Sign in; open **System health** (admin or auditor): **Database: Working**, **Local AI model: Unavailable**
+  (expected online, see below), the search index count matches the processed notes.
+
+## What is different online (and said so on the site)
+
+- **Copilot** gives its labelled rule-based answers: the hosted API cannot reach a local model, and the app only
+  ever sends evidence to a model on the same machine. Running locally with Ollama still gives model answers.
+- **Free-tier sleep**: Render free services sleep after 15 minutes idle; the first request then takes ~30–60 s.
+- **Latency**: Render's nearest region (Singapore) is ~100 ms from the Sydney database per round trip, so pages
+  are slower than locally.
+- **Uploaded files** are kept on the server's disk, which is wiped on redeploy. The note text itself is stored in
+  the database, so processing, search and Copilot are unaffected.
+- **System health** figures are per process and reset whenever the service restarts or wakes up.

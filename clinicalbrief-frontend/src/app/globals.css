@@ -1,0 +1,416 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light Theme (Default) - Inspired by Google Health & Material 3 Expressive */
+  --background: #FAFCF7;
+  --foreground: #090F05;
+  /* Text Primary */
+
+  --card: #FFFFFF;
+  --card-foreground: #090F05;
+
+  --primary: #3F7308;
+  /* Blue 600 */
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #EEF2E9;
+  --secondary-foreground: #364429;
+
+  --muted: #F7F9F4;
+  --muted-foreground: #4A5B38;
+  /* Text Secondary */
+
+  --accent: #F4FAED;
+  /* Soft Blue */
+  --accent-foreground: #325C07;
+
+  --border: #DFE6D6;
+  --input: #EEF2E9;
+  --ring: #3F7308;
+
+  --radius: 1.25rem;
+  /* 20px */
+}
+
+/* Dark Mode Class Overrides - Inspired by Gemini & Vercel */
+.dark {
+  --background: #0B1209;
+  --foreground: #F7F9F4;
+
+  --card: #141D10;
+  --card-foreground: #F7F9F4;
+
+  --primary: #5E9E1F;
+  /* Blue 500 */
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #232E1A;
+  --secondary-foreground: #F7F9F4;
+
+  --muted: #090F05;
+  --muted-foreground: #95A386;
+
+  --accent: #24420A;
+  --accent-foreground: #B2EB76;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.04);
+  --ring: #5E9E1F;
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* Stripe/Linear soft elevation wrapper */
+.premium-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-card:hover {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.01);
+  transform: translateY(-2px);
+}
+
+.dark .premium-card:hover {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.2), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Glassmorphism for floating overlays */
+.premium-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.dark .premium-glass {
+  background: rgba(20, 29, 16, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Premium input elements */
+.premium-input {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+.premium-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(63, 115, 8, 0.15);
+}
+
+/* Micro-animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(63, 115, 8, 0.4);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(63, 115, 8, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(63, 115, 8, 0);
+  }
+}
+
+.ai-pulse-indicator {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); /* no fill: a leftover transform would re-anchor position:fixed children (Copilot drawer) */
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Shimmer animation for skeleton loading cards */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, var(--input) 25%, var(--border) 50%, var(--input) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Scale-in animation for modal entry */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+/* --- Landing page (src/components/Landing.tsx) --- */
+.lp { font-family: 'Inter', sans-serif; }
+.lp-display { font-family: 'Inter Tight', 'Inter', sans-serif; font-weight: 560; }
+.lp-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.lp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+/* Ruler ticks down both page edges, beside the hero card */
+.lp-ruler { position: relative; }
+.lp-ruler::before, .lp-ruler::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 12px; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(9,15,5,.35) 0 1px, transparent 1px 22px);
+}
+.lp-ruler::before { left: 0; }
+.lp-ruler::after { right: 0; }
+@media (max-width: 767px) { .lp-ruler::before, .lp-ruler::after { display: none; } }
+/* Graph paper */
+.lp-grid {
+  background-color: #fff;
+  background-image: linear-gradient(rgba(74,91,56,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(74,91,56,.09) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+/* Note highlights fade in one after another; findings rise in after them */
+.lp-hl { background: transparent; color: inherit; animation: lp-hl .5s ease forwards; }
+.lp-hl-c { --hl: #B2EB76; } .lp-hl-m { --hl: #EBE46A; } .lp-hl-n { --hl: #F2DFAC; text-decoration: line-through; } .lp-hl-f { --hl: #B3C5A0; }
+@keyframes lp-hl { to { background: var(--hl); } }
+.lp-rise { opacity: 0; transform: translateY(8px); animation: lp-rise .5s ease forwards; }
+@keyframes lp-rise { to { opacity: 1; transform: none; } }
+/* The note demo plays when it scrolls into view (ScrollTrigger adds .lp-play) */
+.lp-demo .cv-a { animation-play-state: paused; }
+.lp-demo.lp-play .cv-a { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-hl, .lp-rise, .lp-reveal { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .lp-hl { background: var(--hl); }
+}
+/* "How it works" steps: the hovered step turns dark green; Review is dark until another step is hovered */
+.lp-step { background: #fff; border: 1px solid rgba(179,197,160,.7); color: #090F05; cursor: default;
+  transition: background-color .25s ease, color .25s ease, border-color .25s ease, translate .25s ease; }
+.lp-step .lp-step-n { color: #3F7308; transition: color .25s ease; }
+.lp-step .lp-step-p { color: #4A5B38; transition: color .25s ease; }
+.lp-step:hover, .lp-step.is-active { background: #18280E; border-color: #18280E; color: #fff; }
+.lp-step:hover { translate: 0 -4px; } /* translate, not transform: the scroll-reveal animation owns transform */
+.lp-step:hover .lp-step-n, .lp-step.is-active .lp-step-n { color: #B2EB76; }
+.lp-step:hover .lp-step-p, .lp-step.is-active .lp-step-p { color: #B3C5A0; }
+.lp-steps:hover .lp-step.is-active:not(:hover) { background: #fff; border-color: rgba(179,197,160,.7); color: #090F05; }
+.lp-steps:hover .lp-step.is-active:not(:hover) .lp-step-n { color: #3F7308; }
+.lp-steps:hover .lp-step.is-active:not(:hover) .lp-step-p { color: #4A5B38; }
+
+/* --- Landing hero scene (src/components/HealthScene.tsx) ---
+   Premium motion: one signature curve, three durations (quick 450ms / standard 700ms / slow 1200ms), no overshoot.
+   Entrances use opacity + transform/scale; ambient float uses the independent `translate`/`rotate` properties so
+   the two never fight over `transform`. */
+.hs-heart { opacity: 0; scale: 0.94; animation: hs-heart-in 1200ms cubic-bezier(0.05, 0.7, 0.1, 1) 100ms forwards; }
+@keyframes hs-heart-in { to { opacity: 1; scale: 1; } }
+.hs-card { opacity: 0; transform: translateY(16px); animation: hs-card-in 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes hs-card-in { to { opacity: 1; transform: none; } }
+.hs-ring { opacity: 0; animation: hs-fade 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes hs-fade { to { opacity: 1; } }
+
+/* Ambient float: sine-like ease, alternating, cards out of phase with the heart (counter-motion) */
+.hs-float { animation: hs-float 6.5s cubic-bezier(0.45, 0, 0.55, 1) 1.2s infinite alternate; }
+.hs-float-slow { animation-duration: 8s; animation-name: hs-float-heart; animation-delay: 0s; }
+.hs-float-alt { animation-duration: 7.5s; animation-direction: alternate-reverse; }
+@keyframes hs-float { from { translate: 0 0; } to { translate: 0 -10px; } }
+@keyframes hs-float-heart { from { translate: 0 6px; rotate: -1.5deg; } to { translate: 0 -8px; rotate: 1.5deg; } }
+
+/* Heartbeat: the trace draws across, the heart gives a small double pulse as it passes the spike */
+.hs-ecg { stroke-dasharray: 100; stroke-dashoffset: 100; animation: hs-ecg 2.8s cubic-bezier(0.4, 0, 0.2, 1) 900ms infinite; }
+@keyframes hs-ecg {
+  0% { stroke-dashoffset: 100; opacity: 1; }
+  55% { stroke-dashoffset: 0; opacity: 1; }
+  80% { stroke-dashoffset: 0; opacity: 0; }
+  100% { stroke-dashoffset: 100; opacity: 0; }
+}
+.hs-beat { transform-box: fill-box; transform-origin: center; animation: hs-beat 2.8s cubic-bezier(0.4, 0, 0.2, 1) 900ms infinite; }
+@keyframes hs-beat { 0%, 22%, 40%, 100% { transform: scale(1); } 28% { transform: scale(1.025); } 34% { transform: scale(1.012); } }
+.hs-dot { animation: hs-dot 2.8s ease-in-out 900ms infinite; }
+@keyframes hs-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hs-heart, .hs-card, .hs-ring { animation: none !important; opacity: 1 !important; scale: 1 !important; transform: none !important; }
+  .hs-float, .hs-beat, .hs-dot { animation: none !important; }
+  .hs-ecg { animation: none !important; stroke-dashoffset: 0; }
+}
+
+/* Statement band fragments: corner-ticked boxes, scroll parallax by depth, slow float */
+.sf-box { position: relative; background: rgba(24, 40, 14, 0.6); border: 1px solid rgba(179, 197, 160, 0.28); }
+.sf-box::before, .sf-box::after { content: ""; position: absolute; width: 5px; height: 5px; border-color: #B3C5A0; border-style: solid; }
+.sf-box::before { top: -1px; left: -1px; border-width: 1.5px 0 0 1.5px; }
+.sf-box::after { bottom: -1px; right: -1px; border-width: 0 1.5px 1.5px 0; }
+.sf-float { animation: sf-float 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
+@keyframes sf-float { from { translate: -6px 4px; } to { translate: 6px -4px; } }
+@media (prefers-reduced-motion: reduce) { .sf-float { animation: none !important; } }
+
+/* --- Capability scenes (src/components/CapabilityScenes.tsx) ---
+   Every element rests fully visible; keyframes run the story once per cycle, phased by animation-delay. */
+.cv-a { animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); animation-iteration-count: infinite; }
+
+/* Review deck, 9 s: back -> middle -> front -> key press -> stamp -> fly out right -> back again */
+.cv-dcard { animation-name: cv-deck; animation-duration: 9s; }
+@keyframes cv-deck {
+  0%, 28% { transform: translateY(-36px) scale(.88); opacity: .4; z-index: 1; }
+  33%, 61% { transform: translateY(-18px) scale(.94); opacity: .75; z-index: 2; }
+  66%, 86% { transform: none; opacity: 1; z-index: 3; }
+  95% { transform: translateX(70%) rotate(7deg); opacity: 0; z-index: 3; }
+  95.5%, 99% { transform: translateY(-36px) scale(.88); opacity: 0; z-index: 1; }
+  100% { transform: translateY(-36px) scale(.88); opacity: .4; z-index: 1; }
+}
+.cv-key { animation-name: cv-key; animation-duration: 9s; }
+@keyframes cv-key { 0%, 70% { background: transparent; transform: none; } 71.5% { background: #B2EB76; transform: translateY(2px) scale(.94); } 74%, 100% { background: transparent; transform: none; } }
+.cv-stamp { animation-name: cv-stamp; animation-duration: 9s; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+@keyframes cv-stamp { 0%, 72% { opacity: 0; transform: scale(1.7) rotate(-8deg); } 75.5%, 92% { opacity: 1; transform: scale(1) rotate(-8deg); } 95%, 100% { opacity: 0; transform: scale(1) rotate(-8deg); } }
+.cv-log { animation-name: cv-log; animation-duration: 9s; }
+@keyframes cv-log { 0%, 73% { opacity: .3; background: transparent; } 76%, 92% { opacity: 1; background: rgba(178, 235, 118, .12); } 96%, 100% { opacity: .55; background: transparent; } }
+
+/* Search, 8 s: type -> related terms -> hits -> date range -> hold -> clear */
+.cv-type { display: inline-block; overflow: hidden; white-space: nowrap; width: var(--w, 19ch); animation-name: cv-type; animation-duration: 8s; }
+@keyframes cv-type { 0% { width: 0; } 22%, 92% { width: var(--w, 19ch); } 100% { width: 0; } }
+/* Examples take turns: each is shown for one third of the shared cycle (phased by negative delays) */
+/* Each example ends just before its slot does, so two never overlap. Name and timing are set inline (slotStyle). */
+.cv-slot { animation-timing-function: linear; }
+@keyframes cv-slot2 { 0%, 48.5% { opacity: 1; visibility: visible; } 49%, 100% { opacity: 0; visibility: hidden; } }
+@keyframes cv-slot3 { 0%, 32% { opacity: 1; visibility: visible; } 32.5%, 100% { opacity: 0; visibility: hidden; } }
+@keyframes cv-slot4 { 0%, 24% { opacity: 1; visibility: visible; } 24.5%, 100% { opacity: 0; visibility: hidden; } }
+.cv-dot { background: rgba(178, 235, 118, .3); animation-timing-function: linear; }
+@keyframes cv-dot2 { 0%, 48.5% { background: var(--dot-on, #3F7308); } 49%, 100% { background: rgba(178, 235, 118, .3); } }
+@keyframes cv-dot3 { 0%, 32% { background: var(--dot-on, #3F7308); } 32.5%, 100% { background: rgba(178, 235, 118, .3); } }
+@keyframes cv-dot4 { 0%, 24% { background: var(--dot-on, #3F7308); } 24.5%, 100% { background: rgba(178, 235, 118, .3); } }
+/* A failing validation check turns red instead of green (FHIR example 2) */
+.cv-fail { background: #F2C7A0; color: #331B09; animation-name: cv-fail; animation-duration: 9s; }
+@keyframes cv-fail { 0%, 22% { background: transparent; color: transparent; scale: .8; } 25% { background: #F2C7A0; color: #331B09; scale: 1.15; } 28%, 84% { background: #F2C7A0; color: #331B09; scale: 1; } 88%, 100% { background: transparent; color: transparent; scale: .8; } }
+.cv-caret { animation: cv-caret 1s steps(2, start) infinite; }
+@keyframes cv-caret { to { visibility: hidden; } }
+.cv-chip { animation-name: cv-chip; animation-duration: 8s; }
+@keyframes cv-chip { 0%, 25% { opacity: 0; transform: scale(.85); } 30%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; } }
+.cv-hit { animation-name: cv-hit; animation-duration: 8s; }
+@keyframes cv-hit { 0%, 34% { opacity: 0; transform: translateY(10px); } 40%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; } }
+.cv-range { transform-origin: left; animation-name: cv-range; animation-duration: 8s; }
+@keyframes cv-range { 0%, 46% { opacity: 0; transform: scaleX(0); } 56%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; } }
+.cv-event { animation-name: cv-event; animation-duration: 8s; }
+@keyframes cv-event { 0%, 55% { opacity: .35; scale: 1; } 58% { opacity: 1; scale: 1.5; } 61%, 90% { opacity: 1; scale: 1; } 95%, 100% { opacity: .35; } }
+
+/* Copilot, 9 s. Each step owns a slot so the whole scene clears together at 88-92%:
+   draft words 5-8% | E1 ping 18-20% | advice sentence 24-27% | draft withheld 32-37% | label 38-41% |
+   matching records 45-50% | badges 55-58% */
+.cv-word { animation-name: cv-word; animation-duration: 9s; }
+@keyframes cv-word { 0%, 5% { opacity: 0; transform: translateY(4px); } 8%, 88% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; } }
+.cv-ping { animation-name: cv-ping; animation-duration: 9s; }
+@keyframes cv-ping { 0%, 18% { opacity: 0; box-shadow: 0 0 0 0 rgba(63, 115, 8, .55); } 20% { opacity: 1; box-shadow: 0 0 0 0 rgba(63, 115, 8, .55); } 28%, 88% { opacity: 1; box-shadow: 0 0 0 8px rgba(63, 115, 8, 0); } 92%, 100% { opacity: 0; } }
+.cv-claim { animation-name: cv-claim; animation-duration: 9s; }
+@keyframes cv-claim { 0%, 24% { opacity: 0; transform: translateY(4px); } 27%, 88% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; } }
+.cv-strike { transform-origin: left; animation-name: cv-strike; animation-duration: 9s; }
+@keyframes cv-strike { 0%, 32% { transform: scaleX(0); } 37%, 88% { transform: none; } 92%, 100% { transform: scaleX(0); } }
+/* The draft dims and is crossed out as a whole once the guard withholds it (32-37%) */
+.cv-draft { animation-name: cv-draft; animation-duration: 9s; }
+@keyframes cv-draft { 0%, 32% { opacity: 1; filter: none; } 37%, 88% { opacity: .35; filter: grayscale(1); } 92%, 100% { opacity: 0; } }
+.cv-draft::after { content: ""; position: absolute; left: 8px; right: 8px; top: 50%; height: 2px; background: #A1441B;
+  transform-origin: left; animation: cv-strike 9s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.cv-label { display: inline-block; animation-name: cv-label; animation-duration: 9s; }
+@keyframes cv-label { 0%, 38% { opacity: 0; transform: translateY(4px); } 41%, 88% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; } }
+.cv-src { animation-name: cv-src; animation-duration: 9s; }
+@keyframes cv-src { 0%, 45% { opacity: 0; transform: translateY(-8px); } 50%, 88% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; } }
+.cv-badge { display: inline-block; animation-name: cv-badge; animation-duration: 9s; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+@keyframes cv-badge { 0%, 55% { opacity: 0; transform: scale(.85); } 58%, 88% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; } }
+
+/* FHIR, 9 s: resources fly in 0-16% | checks tick from 22% (staggered) | download unlocks 38-42% | all clear 86-92% */
+.cv-fly { animation-name: cv-fly; animation-duration: 9s; }
+@keyframes cv-fly { 0% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(-6deg); } 6% { opacity: 1; } 16%, 86% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; transform: none; } }
+.cv-check { background: #B2EB76; color: #18280E; animation-name: cv-check; animation-duration: 9s; }
+@keyframes cv-check { 0%, 22% { background: transparent; color: transparent; scale: .8; } 25% { background: #B2EB76; color: #18280E; scale: 1.15; } 28%, 84% { background: #B2EB76; color: #18280E; scale: 1; } 88%, 100% { background: transparent; color: transparent; scale: .8; } }
+.cv-unlock { background: #B2EB76; color: #18280E; animation-name: cv-unlock; animation-duration: 9s; }
+@keyframes cv-unlock { 0%, 38% { background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .4); } 42%, 86% { background: #B2EB76; color: #18280E; } 90%, 100% { background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .4); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-a, .cv-caret { animation: none !important; }
+  .cv-slot:not(:first-child) { display: none; }  /* show the first example only, still */
+}
+
+/* --- Smooth scrolling (GSAP ScrollSmoother) --- */
+#smooth-content { will-change: transform; }
+
+/* Access matrix: the hovered / selected role's column is highlighted */
+.rm-col { transition: background-color .2s ease, color .2s ease; }
+.rm-col.is-on { background: #18280E; color: #fff; }
+
+/* CTA heartbeat line, drawn by scroll */
+.cta-ecg { stroke-dasharray: 1; stroke-dashoffset: 1; }
+@media (prefers-reduced-motion: reduce) { .cta-ecg { stroke-dashoffset: 0; } }
+
+/* How it works note demo: three notes take turns; highlights and findings replay for each (10 s per note) */
+.cv-hl { background: var(--hl); color: inherit; animation-name: cv-hl; animation-duration: 10s; }
+@keyframes cv-hl { 0%, 3% { background: transparent; } 7%, 90% { background: var(--hl); } 95%, 100% { background: transparent; } }
+.cv-rise10 { animation-name: cv-rise10; animation-duration: 10s; }
+@keyframes cv-rise10 { 0%, 12% { opacity: 0; transform: translateY(8px); } 17%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; } }
+
+/* Landing: grid items may shrink below their content width (long, truncated lines would otherwise widen the
+   column and overflow on phones) */
+.lp .grid > * { min-width: 0; }
+
+/* Phones: iOS Safari zooms the page when a focused field's text is under 16px */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* Footer ASCII wordmark: 91 columns of box-drawing characters, sized to fit any width (0.6em per mono glyph) */
+.ft-ascii { font-size: min(17px, calc((100vw - 48px) / (95 * 0.6))); }
+.ft-ascii-grid { display: grid; grid-auto-rows: 1.05em; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; line-height: 1.05; }
+.ft-ascii-grid > span { display: block; overflow: visible; white-space: pre; text-align: center; }
+

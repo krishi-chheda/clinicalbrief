@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set CLINICALBRIEF_ALLOW_REMOTE_DB=1&& py -3.12 -m uvicorn app.main:app --app-dir clinicalbrief-backend --port 8000 --no-access-log"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "clinicalbrief-frontend",
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    }
+  ]
+}

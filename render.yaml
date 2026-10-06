@@ -1,0 +1,31 @@
+# Render blueprint for the ClinicalBrief API (see DEPLOY.md). Secrets use `sync: false`: Render asks for them
+# when the blueprint is applied; they never live in git.
+services:
+  - type: web
+    name: clinicalbrief-api
+    runtime: python
+    region: singapore          # closest Render region to the Supabase project in Sydney
+    plan: free                 # sleeps after 15 min idle; the first request then takes ~30-60 s
+    rootDir: clinicalbrief-backend
+    buildCommand: pip install -r requirements.txt
+    # --no-access-log: uvicorn's access log prints full URLs (patient ids); the app records route templates instead.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: CLINICALBRIEF_ALLOW_REMOTE_DB   # required: the API refuses a non-local database without it
+        value: "1"
+      - key: USE_MOCK_MODELS
+        value: "true"
+      # No LLM is reachable from the host, so Copilot gives its labelled rule-based answers. Only loopback URLs are
+      # accepted, so patient data can never be sent to an outside model.
+      - key: LLM_BASE_URL
+        value: http://localhost:11434
+      - key: DATABASE_URL          # Supabase "Session pooler" URI (IPv4), with the NEW database password
+        sync: false
+      - key: SUPABASE_URL          # https://<project-ref>.supabase.co
+        sync: false
+      - key: CORS_ORIGINS          # the Vercel URL, e.g. https://clinicalbrief.vercel.app (comma-separate several)
+        sync: false

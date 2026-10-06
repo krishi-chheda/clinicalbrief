@@ -1,11 +1,21 @@
 # ClinicalBrief
 
+**Live demo: [clinicalbrief.vercel.app](https://clinicalbrief.vercel.app)** · API: [clinicalbrief.onrender.com](https://clinicalbrief.onrender.com) ([docs](https://clinicalbrief.onrender.com/docs)) · [How it is deployed](DEPLOY.md)
+
 A clinical intelligence platform prototype: it ingests clinical records, structures them into one
 canonical model with provenance, runs an AI pipeline over clinical notes, and keeps humans in control
 of every AI output.
 
 > **Status: research prototype.** It runs on synthetic (Synthea) data only.
 > No clinical validation, accuracy evaluation or regulatory compliance is claimed.
+
+### The live demo
+
+- The public pages (product, security, data, roadmap, docs) need no account. The workspace needs a sign-in, and new
+  accounts start as `pending` with no access until an admin grants a role.
+- **Copilot online gives its labelled rule-based answers**: the hosted API cannot reach a local model, and patient data
+  is only ever sent to a model on the same machine. Run it locally with Ollama for model answers.
+- The API is on Render's free plan: after 15 idle minutes it sleeps, and the first request takes ~30-60 s.
 
 ## What is implemented, and how real it is
 

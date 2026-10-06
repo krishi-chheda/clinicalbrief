@@ -1,6 +1,8 @@
 # Deploying ClinicalBrief
 
 Frontend on **Vercel**, API on **Render**, database and sign-in on the existing **Supabase** project (Sydney).
+
+**Live:** <https://clinicalbrief.vercel.app> (frontend) · <https://clinicalbrief.onrender.com> (API)
 Everything below is done by the project owner in their own accounts; no secret goes into git.
 
 ```
@@ -45,6 +47,10 @@ The commit runs the secret scan; the push also runs the Postgres test suite and 
    - `CORS_ORIGINS`: put `http://localhost:3000` for now; you replace it in step 4.
    - Only if your Supabase project still uses the legacy shared JWT secret: add `JWT_SECRET` too (most new projects
      use signing keys, which the API fetches itself).
+   - **Created the service by hand instead of from the Blueprint?** Then `render.yaml` is not applied: set Root Directory
+     `clinicalbrief-backend`, the build and start commands from `render.yaml`, Health Check Path `/`, and every
+     variable in its `envVars` (including `PYTHON_VERSION=3.12.10`; Render's default Python is newer). Symptom when it
+     is missing: `Could not open requirements file: 'requirements.txt'`.
 3. Wait for the deploy, then open `https://<service>.onrender.com/`. It should return `"status": "online"`.
 
 ## 3. Vercel (frontend)
@@ -57,9 +63,13 @@ The commit runs the secret scan; the push also runs the Postgres test suite and 
    - `NEXT_PUBLIC_API_URL` = `https://<service>.onrender.com`
 4. Deploy. Note the URL, e.g. `https://clinicalbrief.vercel.app`.
 
+`NEXT_PUBLIC_` values are compiled into the JavaScript at build time: after adding or changing one, **Redeploy without
+the build cache**. Check: the live bundle must contain the Render URL, not `localhost:8000`.
+
 ## 4. Connect them
 
-1. **Render** → the service → Environment → set `CORS_ORIGINS` to the Vercel URL (no trailing slash). Render redeploys.
+1. **Render** → the service → Environment → set `CORS_ORIGINS` to the Vercel URL, exactly (no quotes, no trailing slash),
+   then **Save, rebuild and deploy**. If the Vercel project is renamed, its URL changes: update this and Supabase.
 2. **Supabase** → Authentication → URL Configuration: **Site URL** = the Vercel URL; add it to **Redirect URLs**.
 
 ## 5. Check it

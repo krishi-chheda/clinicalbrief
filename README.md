@@ -260,5 +260,3 @@ Frontend: `npx tsc --noEmit`, `npm run build`, `npm audit --omit=dev`. No linter
   heavy imports the Supabase free tier throttles disk I/O, so round trips can temporarily rise from ~24 ms to
   50-120 ms.
 - 95 Tailwind classes use colour shades that don't exist and render unstyled.
-#   c l i n i c a l b r i e f  
- 

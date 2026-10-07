@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../supabase";
 import { INFO_VIEWS, parseRoute, pathFor, patientPath, type View } from "../lib/routes";
 import InfoPage from "../components/public/InfoPage";
+import KnowledgeGraphCanvas from "../components/KnowledgeGraphCanvas";
+import NoteComparison from "../components/NoteComparison";
 import LoginPage from "../components/public/LoginPage";
 import { LoadingScreen } from "../components/public/StatusScreens";
 import ReviewQueue from "../components/ReviewQueue";
@@ -192,11 +194,6 @@ export default function ClinicalBriefApp() {
 
   // Phase 1 Additional States
   const [clickedEntity, setClickedEntity] = useState<Entity | null>(null);
-  const [graphZoom, setGraphZoom] = useState<number>(1.0);
-  const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState<boolean>(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [graphHoveredNode, setGraphHoveredNode] = useState<any | null>(null);
   const [graphFilters, setGraphFilters] = useState<Record<string, boolean>>(
     Object.fromEntries(GRAPH_TYPES.map(t => [t.type, true])));
 
@@ -374,103 +371,25 @@ export default function ClinicalBriefApp() {
   };
 
   const renderKnowledgeGraph = (isWidget: boolean) => {
-    const W = 900, H = 560, CX = W / 2, CY = H / 2;
-    const resetGraph = () => { setGraphZoom(1.0); setGraphPan({ x: 0, y: 0 }); setSelectedNode(null); };
     if (!graphData) return <div className="text-sm text-slate-500 p-6">Loading graph...</div>;
 
     const visible = graphData.nodes.filter(n => n.type === "Patient" || graphFilters[n.type]);
     const ids = new Set(visible.map(n => n.id));
     const edges = graphData.edges.filter(e => ids.has(e.source) && ids.has(e.target));
-
-    // Radial layout: each visible type gets its own sector; nodes are spread evenly inside it on two
-    // alternating rings, so labels don't pile up even with 15 nodes per type.
-    const types = GRAPH_TYPES.filter(t => visible.some(n => n.type === t.type));
-    const pos = new Map<string, { x: number; y: number; angle: number }>();
-    visible.filter(n => n.type === "Patient").forEach(n => pos.set(n.id, { x: CX, y: CY, angle: 0 }));
-    types.forEach((t, ti) => {
-      const group = visible.filter(n => n.type === t.type);
-      const sector = (2 * Math.PI) / types.length;
-      group.forEach((n, i) => {
-        const angle = -Math.PI / 2 + ti * sector + (sector * (i + 0.5)) / group.length;
-        const r = i % 2 === 0 ? 170 : 235;
-        pos.set(n.id, { x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r, angle });
-      });
-    });
-    const related = (a: string, b: string) => a === b || edges.some(e => (e.source === a && e.target === b) || (e.source === b && e.target === a));
+    const patientLabel = selectedPatient ? displayName(selectedPatient) : "Patient";
     const onlyPatient = visible.length <= 1;
     const capped = GRAPH_TYPES.filter(t => (graphData.totals?.[t.type] ?? 0) > (graphData.max_per_type ?? Infinity));
 
     return (
       <div className="flex flex-col gap-3 w-full">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            {GRAPH_TYPES.map(t => (
-              <label key={t.type} className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="checkbox" checked={graphFilters[t.type] ?? true}
-                  onChange={() => setGraphFilters(prev => ({ ...prev, [t.type]: !(prev[t.type] ?? true) }))} className="h-3 w-3" />
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.color }} />
-                {t.plural}{graphData.totals?.[t.type] ? ` (${graphData.totals[t.type]})` : ""}
-              </label>
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            <button aria-label="Zoom in" onClick={() => setGraphZoom(z => Math.min(3, z + 0.2))} className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-800 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">+</button>
-            <button aria-label="Zoom out" onClick={() => setGraphZoom(z => Math.max(0.5, z - 0.2))} className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-800 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">-</button>
-            <button onClick={resetGraph} className="h-7 px-2 rounded-md border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">Reset</button>
-          </div>
-        </div>
-
         <div className="flex flex-col xl:flex-row gap-3">
-          <div
-            className={`relative flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 overflow-hidden ${isWidget ? "h-80" : "h-[30rem]"}`}
-            onWheel={(e) => setGraphZoom(z => Math.max(0.5, Math.min(3, z * (e.deltaY < 0 ? 1.1 : 0.9))))}
-            onMouseDown={(e) => { setIsPanning(true); setPanStart({ x: e.clientX - graphPan.x, y: e.clientY - graphPan.y }); }}
-            onMouseMove={(e) => isPanning && setGraphPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y })}
-            onMouseUp={() => setIsPanning(false)}
-            onMouseLeave={() => setIsPanning(false)}
-          >
-            <svg className="w-full h-full cursor-grab active:cursor-grabbing select-none" viewBox={`0 0 ${W} ${H}`} role="img"
-              aria-label={`Graph of ${visible.length - 1} items linked to the patient`}>
-              <g transform={`translate(${graphPan.x}, ${graphPan.y}) translate(${CX} ${CY}) scale(${graphZoom}) translate(${-CX} ${-CY})`}>
-                {edges.map((e, i) => {
-                  const a = pos.get(e.source), b = pos.get(e.target);
-                  if (!a || !b) return null;
-                  const hot = graphHoveredNode && (e.source === graphHoveredNode.id || e.target === graphHoveredNode.id);
-                  return (
-                    <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                      stroke={hot ? "#3F7308" : "#C5D0B8"} strokeWidth={hot ? 2 : 1}
-                      strokeDasharray={e.label === "mentioned in same note" ? "4 4" : undefined}
-                      opacity={graphHoveredNode && !hot ? 0.2 : 0.9} />
-                  );
-                })}
-                {visible.map(n => {
-                  const p = pos.get(n.id)!;
-                  const isPatient = n.type === "Patient";
-                  const fade = graphHoveredNode && !related(n.id, graphHoveredNode.id);
-                  const right = Math.cos(p.angle) >= 0;
-                  const label = isPatient && selectedPatient ? displayName(selectedPatient) : n.label;
-                  return (
-                    <g key={n.id} className="cursor-pointer" opacity={fade ? 0.2 : 1}
-                      onClick={(ev) => { ev.stopPropagation(); setSelectedNode({ ...n, label }); }}
-                      onMouseEnter={() => setGraphHoveredNode(n)} onMouseLeave={() => setGraphHoveredNode(null)}>
-                      <title>{label}</title>
-                      <circle cx={p.x} cy={p.y} r={isPatient ? 22 : 9} fill={isPatient ? "#18280E" : GRAPH_COLOR[n.type] || "#6B7A5C"}
-                        stroke={n.source === "ai" ? "#090F05" : selectedNode?.id === n.id ? "#3F7308" : "#FFFFFF"}
-                        strokeWidth={n.source === "ai" || selectedNode?.id === n.id ? 2 : 1.5}
-                        strokeDasharray={n.source === "ai" ? "3 2" : undefined} />
-                      <text
-                        x={isPatient ? p.x : p.x + (right ? 14 : -14)} y={isPatient ? p.y + 40 : p.y + 4}
-                        textAnchor={isPatient ? "middle" : right ? "start" : "end"}
-                        className={`${isPatient ? "text-[15px] font-semibold" : "text-[13px]"} fill-slate-700 dark:fill-slate-300 pointer-events-none`}>
-                        {isPatient ? label : shorten(label)}
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
+          <div className="relative flex-1 min-w-0">
+            <KnowledgeGraphCanvas nodes={visible} edges={edges} types={GRAPH_TYPES} filters={graphFilters} totals={graphData.totals}
+              onToggleType={t => setGraphFilters(prev => ({ ...prev, [t]: !(prev[t] ?? true) }))}
+              patientKey={selectedPatient?.patient_id ?? ""} patientLabel={patientLabel} selectedId={selectedNode?.id ?? null}
+              onSelect={(n, label) => setSelectedNode({ ...n, label })} shorten={shorten} height={isWidget ? "h-80" : "h-[34rem]"} />
             {onlyPatient && (
-              <div className="absolute inset-x-0 bottom-6 text-center text-sm text-slate-500 px-6">
+              <div className="absolute inset-x-0 bottom-14 text-center text-sm text-[#B3C5A0] px-6 pointer-events-none">
                 Nothing to draw yet: no current conditions, medications or allergies in the record, and no reviewed AI findings.
                 {graphData.pending_review ? ` ${graphData.pending_review} AI findings await review in Entity review.` : ""}
               </div>
@@ -485,7 +404,7 @@ export default function ClinicalBriefApp() {
                 <p className="text-slate-600 dark:text-slate-400">{selectedNode.details}</p>
               </div>
             ) : (
-              <p className="text-slate-500">Click a node for its details. Hover to highlight its connections. Scroll to zoom, drag to pan.</p>
+              <p className="text-slate-500">Click a node for its details. Hover to light up its connections. Drag to rotate, scroll to zoom, or press tour.</p>
             )}
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1.5">
               <p>Solid outline: from the patient's record (source data).</p>
@@ -2179,7 +2098,7 @@ export default function ClinicalBriefApp() {
     return (
       <div className="space-y-8 animate-slide-up">
         {/* Patient banner: stays visible while scrolling the record */}
-        <div className="sticky top-0 z-30 -mx-8 -mt-6 px-8 py-4 bg-[#FAFCF7]/95 dark:bg-[#0B1209]/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="sticky top-0 md:-top-6 z-30 -mx-8 -mt-6 px-8 py-4 bg-[#FAFCF7]/95 dark:bg-[#0B1209]/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <div className="min-w-0">
             <button onClick={() => setCurrentView("patients")} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
               &larr; Patients
@@ -2654,98 +2573,10 @@ export default function ClinicalBriefApp() {
                 <div className="premium-card p-6 space-y-6 animate-slide-up">
                   <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-900">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Timeline Note Comparison</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400 font-mono">Earliest vs latest note{comparisonData.pending_review ? ` · ${comparisonData.pending_review} entities awaiting review (not compared)` : ""}</span>
                   </div>
 
-                  {comparisonData.can_compare ? (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-900 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-xs text-slate-800 dark:text-white">{comparisonData.doc1.classification}</span>
-                            <span className="text-[11px] font-mono text-slate-400">{formatDate(comparisonData.doc1.upload_date)}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed font-sans">{comparisonData.doc1.summary}</p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-900 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-xs text-slate-800 dark:text-white">{comparisonData.doc2.classification}</span>
-                            <span className="text-[11px] font-mono text-slate-400">{formatDate(comparisonData.doc2.upload_date)}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed font-sans">{comparisonData.doc2.summary}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <span className="text-xs uppercase font-bold text-slate-400">Discrepancy & Evolution Analysis</span>
-
-                        <div className="grid grid-cols-2 gap-4 text-xs">
-                          {/* Diagnoses Changes */}
-                          <div className="space-y-2.5">
-                            <h5 className="font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-900 pb-1">Diagnoses</h5>
-                            {comparisonData.analysis.diseases.added.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-[#16A34A] block">Only in later note</span>
-                                {comparisonData.analysis.diseases.added.map((d: string, i: number) => (
-                                  <div key={i} className="inline-block bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5">{d}</div>
-                                ))}
-                              </div>
-                            )}
-                            {comparisonData.analysis.diseases.resolved.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-[#DC2626] block">Only in earlier note</span>
-                                {comparisonData.analysis.diseases.resolved.map((d: string, i: number) => (
-                                  <div key={i} className="inline-block bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5 line-through">{d}</div>
-                                ))}
-                              </div>
-                            )}
-                            {comparisonData.analysis.diseases.maintained.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-slate-400 block">In both notes</span>
-                                {comparisonData.analysis.diseases.maintained.map((d: string, i: number) => (
-                                  <div key={i} className="inline-block bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5">{d}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Medications Changes */}
-                          <div className="space-y-2.5">
-                            <h5 className="font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-900 pb-1">Medications</h5>
-                            {comparisonData.analysis.medications.added.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-[#16A34A] block">Only in later note</span>
-                                {comparisonData.analysis.medications.added.map((m: string, i: number) => (
-                                  <div key={i} className="inline-block bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5">{m}</div>
-                                ))}
-                              </div>
-                            )}
-                            {comparisonData.analysis.medications.discontinued.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-[#DC2626] block">Only in earlier note</span>
-                                {comparisonData.analysis.medications.discontinued.map((m: string, i: number) => (
-                                  <div key={i} className="inline-block bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5 line-through">{m}</div>
-                                ))}
-                              </div>
-                            )}
-                            {comparisonData.analysis.medications.maintained.length > 0 && (
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-bold text-slate-400 block">In both notes</span>
-                                {comparisonData.analysis.medications.maintained.map((m: string, i: number) => (
-                                  <div key={i} className="inline-block bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs font-medium px-2 py-0.5 rounded mr-1.5 mb-1.5">{m}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-slate-400 text-xs">
-                      {comparisonData.message || "Upload multiple documents to perform timeline Note Comparison."}
-                    </div>
-                  )}
+                  <NoteComparison data={comparisonData} canReview={["admin", "clinician", "consultant", "coder"].includes(userRole)}
+                    onOpenReview={() => setCurrentView("review")} />
                 </div>
               )}
 

@@ -126,6 +126,9 @@ export default function ClinicalBriefApp() {
   const [token, setToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const [userRole, setUserRole] = useState<string>("");
+  // Public demo (anonymous sign-in, role `demo`): read-only, scoped by the API to the flagged synthetic patients.
+  const isDemo = userRole === "demo";
+  const canReview = ["admin", "clinician", "consultant", "coder"].includes(userRole);
   const [password, setPassword] = useState<string>("");
   // Layout preview only - never changes the user's actual role.
   const [layoutPreset, setLayoutPreset] = useState<string | null>(null);
@@ -773,7 +776,7 @@ export default function ClinicalBriefApp() {
                           </span>
                         </td>
                         <td className="py-2.5 text-right space-x-1" onClick={(e) => e.stopPropagation()}>
-                          {ent.review_status === "pending" ? (
+                          {!canReview ? null : ent.review_status === "pending" ? (
                             <div className="inline-flex space-x-0.5">
                               <button
                                 onClick={() => handleReviewEntity(ent.entity_id, "approved")}
@@ -860,7 +863,7 @@ export default function ClinicalBriefApp() {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right space-x-1" onClick={(e) => e.stopPropagation()}>
-                        {ent.review_status === "pending" && (
+                        {canReview && ent.review_status === "pending" && (
                           <div className="inline-flex space-x-0.5">
                             <button
                               onClick={() => handleReviewEntity(ent.entity_id, "approved")}
@@ -1413,18 +1416,32 @@ export default function ClinicalBriefApp() {
       setLoginError(error?.message || "Sign-in failed.");
       return;
     }
-    const res = await fetchProfile(data.session.access_token);
+    setLoginError(await finishSignIn(data.session.access_token,
+      "Signed in, but this account has no ClinicalBrief role yet. Ask an administrator."));
+  };
+
+  // Loads the profile for a fresh session; returns an error message (and signs out) if there is no usable role.
+  const finishSignIn = async (accessToken: string, noRoleMessage: string): Promise<string | null> => {
+    const res = await fetchProfile(accessToken);
     if (!res?.ok) {
       await supabase.auth.signOut();
-      setLoginError(res?.status === 403
-        ? "Signed in, but this account has no ClinicalBrief role yet. Ask an administrator."
-        : "Signed in, but your ClinicalBrief profile could not be loaded.");
-      return;
+      return res?.status === 403 ? noRoleMessage : "Signed in, but your ClinicalBrief profile could not be loaded.";
     }
     const profile = await res.json();
     setUserRole(profile.role);
     setUserEmail(profile.email);
-    setToken(data.session.access_token);
+    setToken(accessToken);
+    return null;
+  };
+
+  // "Try the demo": anonymous sign-in; the signup trigger gives anonymous users the read-only `demo` role.
+  const handleTryDemo = async (captchaToken?: string): Promise<string | null> => {
+    if (!isBackendOnline) return "The ClinicalBrief API is unreachable right now. Please try again in a minute.";
+    const { data, error } = await supabase.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
+    if (error || !data.session) {
+      return /anonymous/i.test(error?.message || "") ? "The public demo is not switched on yet." : error?.message || "Could not start the demo.";
+    }
+    return finishSignIn(data.session.access_token, "The demo account could not be set up. Please try again later.");
   };
 
   const handleLogout = async () => {
@@ -1559,7 +1576,7 @@ export default function ClinicalBriefApp() {
   // --- Views ---
 
   const renderLogin = () => (
-    <LoginPage email={userEmail} onEmailChange={setUserEmail} password={password} onPasswordChange={setPassword}
+    <LoginPage onTryDemo={handleTryDemo} email={userEmail} onEmailChange={setUserEmail} password={password} onPasswordChange={setPassword}
       onSubmit={handleLogin} error={loginError} />
   );
 
@@ -1577,10 +1594,10 @@ export default function ClinicalBriefApp() {
 
           <div className="p-3 rounded-2xl border border-slate-100 dark:border-slate-900 bg-slate-50 dark:bg-slate-900/30 flex items-center space-x-3">
             <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold uppercase text-xs">
-              {userEmail ? userEmail[0] : "D"}
+              {isDemo ? "D" : userEmail ? userEmail[0] : "D"}
             </div>
             <div className="overflow-hidden">
-              <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">{userEmail || "Signed in"}</p>
+              <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">{isDemo ? "Demo visitor" : userEmail || "Signed in"}</p>
               <p className="text-[11px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wide">{userRole}</p>
             </div>
           </div>
@@ -1602,13 +1619,13 @@ export default function ClinicalBriefApp() {
               <span>Patients</span>
             </button>
 
-            <button
+            {!isDemo && <button
               onClick={() => setCurrentView("upload")}
               className={`w-full flex items-center space-x-3 px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all ${currentView === "upload" ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-900/10" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/40"}`}
             >
               <FileUp className="h-4 w-4" />
               <span>Upload Center</span>
-            </button>
+            </button>}
 
             <button
               onClick={() => setCurrentView("search")}
@@ -1648,13 +1665,13 @@ export default function ClinicalBriefApp() {
               </button>
             )}
 
-            <button
+            {!isDemo && <button
               onClick={() => setCurrentView("audit")}
               className={`w-full flex items-center space-x-3 px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all ${currentView === "audit" ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-900/10" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/40"}`}
             >
               <ShieldAlert className="h-4 w-4" />
               <span>Audit Trails</span>
-            </button>
+            </button>}
 
             <button
               onClick={() => setCurrentView("settings")}
@@ -1739,6 +1756,14 @@ export default function ClinicalBriefApp() {
             <Menu className="h-5 w-5" />
           </button>
         </div>
+        {isDemo && (
+          <div role="status" className="mb-6 px-4 py-2.5 rounded-xl border border-[#B2EB76] bg-[#F4FAED] dark:bg-[#B2EB76]/10 dark:border-[#B2EB76]/30 text-xs text-[#18280E] dark:text-[#DFF5C4] flex flex-wrap items-center justify-between gap-2">
+            <span>
+              <b className="font-semibold">Demo:</b> {patients.length || 10} synthetic patients, read-only. Copilot runs the rule-based fallback on the hosted demo.
+            </span>
+            <button onClick={handleLogout} className="px-2.5 py-1 rounded-md border border-[#18280E]/30 dark:border-[#B2EB76]/40 font-semibold hover:bg-white/60 dark:hover:bg-white/10">Leave demo</button>
+          </div>
+        )}
         {!isBackendOnline && (
           <div className="mb-4 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-700 flex items-center justify-between">
             <span>The ClinicalBrief API is unreachable. No data can be shown until it is back.</span>
@@ -1764,13 +1789,13 @@ export default function ClinicalBriefApp() {
             <p className="text-[#4A5B38] dark:text-slate-400 text-sm mt-1">Patient registry and human-review status of AI output.</p>
           </div>
 
-          <button
+          {!isDemo && <button
             onClick={() => setCurrentView("upload")}
             className="px-4 py-2.5 text-xs rounded-full bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center space-x-2 transition-all shadow-lg shadow-blue-500/10"
           >
             <FileUp className="h-4 w-4" />
             <span>Ingest Document</span>
-          </button>
+          </button>}
         </div>
 
         {stats ? (
@@ -2487,7 +2512,7 @@ export default function ClinicalBriefApp() {
                                 </span>
                               </td>
                               <td className="px-5 py-3 text-right space-x-1.5" onClick={(e) => e.stopPropagation()}>
-                                {ent.review_status === "pending" && (
+                                {canReview && ent.review_status === "pending" && (
                                   <div className="inline-flex space-x-1">
                                     <button
                                       onClick={() => handleReviewEntity(ent.entity_id, "approved")}
@@ -2898,7 +2923,7 @@ export default function ClinicalBriefApp() {
   );
 
   // Router dispatcher
-  if (currentView === "landing") return <Landing onSignIn={() => setCurrentView("login")} />;
+  if (currentView === "landing") return <Landing onSignIn={() => setCurrentView("login")} onTryDemo={handleTryDemo} />;
   if (INFO_VIEWS.includes(currentView)) return <InfoPage view={currentView} />;
   if (currentView === "login") return renderLogin();
   if (!authReady) {

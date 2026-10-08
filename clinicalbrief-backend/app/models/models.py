@@ -1,6 +1,6 @@
 import uuid
 import json
-from sqlalchemy import Column, String, Float, DateTime, Date, ForeignKey, Text, Integer, JSON, Uuid, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Float, DateTime, Date, ForeignKey, Text, Integer, JSON, Uuid, Boolean, UniqueConstraint, false
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import relationship
@@ -65,6 +65,8 @@ class Patient(SourceMixin, Base):
     deceased_date = Column(Date, nullable=True)
     gender = Column(String(20), nullable=False)
     assigned_clinician_id = Column(UUIDStr, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Public demo sandbox (migration 0012): the only patients the anonymous 'demo' role can see.
+    is_demo = Column(Boolean, nullable=False, default=False, server_default=false())
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     documents = relationship("Document", back_populates="patient", cascade="all, delete-orphan")

@@ -11,6 +11,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ScrollSmoother } from "gsap/ScrollSmoother";
 import { useGSAP } from "@gsap/react";
 import HealthScene, { StatementFragments } from "./HealthScene";
+import TryDemoButton from "./public/TryDemoButton";
 import { Eyebrow, Mono, SiteFooter, SiteHeader } from "./public/kit";
 import { CopilotScene, FhirScene, ReviewScene, SearchScene, SlotDots, slotStyle } from "./CapabilityScenes";
 import { ArrowRight, Check, CheckCircle2, Database, FileText, Minus, Search, Sparkles } from "lucide-react";
@@ -199,7 +200,7 @@ function AccessMatrix() {
   );
 }
 
-export default function Landing({ onSignIn }: { onSignIn: () => void }) {
+export default function Landing({ onSignIn, onTryDemo }: { onSignIn: () => void; onTryDemo: (captchaToken?: string) => Promise<string | null> }) {
   const button = "lp-mono text-[13px] px-4 py-2.5 rounded-md transition-colors";
   const root = useRef<HTMLDivElement>(null);
   const wrapper = useRef<HTMLDivElement>(null);
@@ -277,6 +278,7 @@ export default function Landing({ onSignIn }: { onSignIn: () => void }) {
                   counts, and links each back to the sentence it came from.
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
+                  <TryDemoButton onStart={onTryDemo} className={`${button} bg-[#B2EB76] text-[#18280E] hover:bg-[#c3f290]`}>Try the demo</TryDemoButton>
                   <button onClick={onSignIn} className={`${button} bg-[#090F05] text-white hover:bg-[#18280E]`}>Sign in to the workspace</button>
                   <a href="#how" onClick={go("how")} className={`${button} bg-white border border-[#B3C5A0] hover:bg-[#F1F3EE]`}>How it works</a>
                 </div>
@@ -466,7 +468,8 @@ export default function Landing({ onSignIn }: { onSignIn: () => void }) {
                   <h2 className="lp-display text-white text-4xl md:text-6xl leading-[1.03] tracking-[-0.025em]">See it on 409 synthetic patients</h2>
                   <p className="mt-4 text-[#B3C5A0]">Synthea sample data and the Synthea Coherent Data Set (CC BY 4.0). No real patient data.</p>
                   <div className="mt-8 flex flex-wrap justify-center gap-3">
-                    <button onClick={onSignIn} className={`${button} bg-[#B2EB76] text-[#18280E] hover:bg-[#c3f290]`}>Sign in to the workspace</button>
+                    <TryDemoButton onStart={onTryDemo} className={`${button} bg-[#B2EB76] text-[#18280E] hover:bg-[#c3f290]`}>Try the demo</TryDemoButton>
+                    <button onClick={onSignIn} className={`${button} border border-white/20 text-white hover:bg-white/10`}>Sign in to the workspace</button>
                     <a href="#how" onClick={go("how")} className={`${button} border border-white/20 text-white hover:bg-white/10`}>How it works</a>
                   </div>
                 </div>

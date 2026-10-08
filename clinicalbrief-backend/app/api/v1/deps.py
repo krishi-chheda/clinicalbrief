@@ -16,7 +16,10 @@ security = HTTPBearer()
 #   coder      - reads all records, reviews/edits extracted codes, exports FHIR
 #   auditor    - read-only across all records + audit trail + governance
 #   researcher - read-only across all records (de-identified views are a later phase)
-ROLES = {"admin", "clinician", "consultant", "coder", "auditor", "researcher"}
+#   demo       - public "Try the demo" sandbox (anonymous sign-in, migration 0012): read-only, and only the patients
+#                flagged is_demo. In none of the role sets below, so every write, review, export and governance
+#                endpoint refuses it. Copilot is allowed: conversations are owner-scoped like everyone else's.
+ROLES = {"admin", "clinician", "consultant", "coder", "auditor", "researcher", "demo"}
 GLOBAL_READ_ROLES = {"admin", "consultant", "coder", "auditor", "researcher"}
 CLINICAL_WRITE_ROLES = {"admin", "clinician", "consultant"}       # create patients, upload documents
 REVIEW_ROLES = {"admin", "clinician", "consultant", "coder"}       # approve / reject / edit AI output
@@ -68,11 +71,15 @@ def audit_read(db: Session, user: User, action: str, reference: str) -> None:
 
 
 def can_access_patient(user: User, patient: Patient) -> bool:
+    if user.role == "demo":
+        return bool(patient.is_demo)
     return user.role in GLOBAL_READ_ROLES or patient.assigned_clinician_id == user.id
 
 
 def accessible_patient_ids(user: User, db: Session):
     """None means unrestricted; otherwise the set of patient ids the user may see."""
+    if user.role == "demo":
+        return {pid for (pid,) in db.query(Patient.patient_id).filter(Patient.is_demo.is_(True))}
     if user.role in GLOBAL_READ_ROLES:
         return None
     return {pid for (pid,) in db.query(Patient.patient_id).filter(Patient.assigned_clinician_id == user.id)}

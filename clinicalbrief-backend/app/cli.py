@@ -7,6 +7,7 @@
     py -3.12 -m app.cli process-notes --per-patient 3     # each patient's newest 3 unprocessed notes
     py -3.12 -m app.cli set-role someone@example.com consultant
     py -3.12 -m app.cli ask <patient_id> "What medications is the patient on?"
+    py -3.12 -m app.cli flag-demo [--count 10] [--apply]     # choose the public demo patients (dry run by default)
 """
 import argparse
 import json
@@ -50,6 +51,62 @@ def print_run(db, run: ImportRun):
         print(f"  ! {err.source_file} {err.record_ref}: {err.reason}")
 
 
+# ponytail: fixed thresholds; tune if the dataset changes. The cap keeps each demo record light enough for the free
+# hosted API (the largest synthetic records have tens of thousands of observations).
+DEMO_MIN_NOTES, DEMO_MAX_LABS = 2, 3000
+
+
+def pick_demo_patients(db, count: int):
+    """The `count` Synthea patients best suited to the public demo: at least two analysed notes (so Compare works),
+    some conditions, medications and lab results, not oversized. Ranked by reviewed AI findings, then analysed
+    notes, then conditions + medications. Returns [(patient, stats)]."""
+    from sqlalchemy import func
+    from app.models.models import Diagnosis, Entity, Medication, Observation, Patient
+    from app.services.entities import REVIEWED_STATUSES
+
+    def per_patient(q):
+        return dict(q.all())
+    notes = per_patient(db.query(Document.patient_id, func.count()).filter(Document.status == "completed").group_by(Document.patient_id))
+    conds = per_patient(db.query(Diagnosis.patient_id, func.count()).group_by(Diagnosis.patient_id))
+    meds = per_patient(db.query(Medication.patient_id, func.count()).group_by(Medication.patient_id))
+    labs = per_patient(db.query(Observation.patient_id, func.count()).group_by(Observation.patient_id))
+    reviewed = per_patient(db.query(Document.patient_id, func.count(Entity.entity_id))
+                           .join(Entity, Entity.document_id == Document.document_id)
+                           .filter(Entity.review_status.in_(REVIEWED_STATUSES)).group_by(Document.patient_id))
+    picked = []
+    for patient in db.query(Patient).filter(Patient.source_system == synthea.SOURCE):
+        pid = patient.patient_id
+        stats = {"notes": notes.get(pid, 0), "reviewed": reviewed.get(pid, 0), "conditions": conds.get(pid, 0),
+                 "medications": meds.get(pid, 0), "labs": labs.get(pid, 0)}
+        if (stats["notes"] >= DEMO_MIN_NOTES and stats["conditions"] and stats["medications"]
+                and 0 < stats["labs"] <= DEMO_MAX_LABS):
+            picked.append((patient, stats))
+    picked.sort(key=lambda ps: (ps[1]["reviewed"], ps[1]["notes"], ps[1]["conditions"] + ps[1]["medications"]), reverse=True)
+    return picked[:count]
+
+
+def flag_demo(db, count: int, apply: bool):
+    from app.models.models import Patient
+    chosen = pick_demo_patients(db, count)
+    if not chosen:
+        sys.exit("No Synthea patient qualifies (needs >= 2 analysed notes, conditions, medications and lab results).")
+    print(f"{'patient_id':38} {'name':28} {'notes':>5} {'reviewed':>8} {'conds':>5} {'meds':>5} {'labs':>5}")
+    for p, st in chosen:
+        print(f"{p.patient_id:38} {(p.first_name + ' ' + p.last_name)[:28]:28} {st['notes']:>5} {st['reviewed']:>8} "
+              f"{st['conditions']:>5} {st['medications']:>5} {st['labs']:>5}")
+    if len(chosen) < count:
+        print(f"Only {len(chosen)} patients qualify (asked for {count}).")
+    if not apply:
+        print("Dry run: nothing changed. Re-run with --apply to make exactly these the demo patients.")
+        return
+    db.query(Patient).filter(Patient.is_demo.is_(True)).update({Patient.is_demo: False}, synchronize_session=False)
+    db.query(Patient).filter(Patient.patient_id.in_([p.patient_id for p, _ in chosen])).update(
+        {Patient.is_demo: True}, synchronize_session=False)
+    db.add(AuditLog(user_id=None, action_type="demo_patients_flagged", extraction_source=f"{len(chosen)} patients"))
+    db.commit()
+    print(f"Flagged {len(chosen)} demo patients; every other patient is now is_demo = false.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="app.cli", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -62,8 +119,10 @@ def main(argv=None):
     p = sub.add_parser("set-role"); p.add_argument("email"); p.add_argument("role")
     p = sub.add_parser("ask", help="grounded Copilot answer from the local LLM (no auth; local admin tool)")
     p.add_argument("patient_id"); p.add_argument("question")
+    p = sub.add_parser("flag-demo", help="choose the patients the public demo can see (dry run unless --apply)")
+    p.add_argument("--count", type=int, default=10); p.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
-    if args.cmd in ("import", "process-notes", "set-role", "ask") and not getattr(args, "dry_run", False):
+    if (args.cmd in ("import", "process-notes", "set-role", "ask") and not getattr(args, "dry_run", False)) or             (args.cmd == "flag-demo" and args.apply):
         from app.core.database import db_host, is_remote, is_sqlite
         target = "local SQLite" if is_sqlite else f"{'REMOTE' if is_remote else 'local'} Postgres at {db_host}"
         print(f"Target database: {target}", file=sys.stderr)
@@ -115,6 +174,8 @@ def main(argv=None):
                 print(f"  {c['id']} [{c['kind']} | {c['source_system']} | {c['date']}] {c['text'][:120]}")
             for w in r["warnings"]:
                 print(f"  ! {w}")
+        elif args.cmd == "flag-demo":
+            flag_demo(db, args.count, args.apply)
         elif args.cmd == "set-role":
             from app.api.v1.deps import ROLES
             if args.role not in ROLES:

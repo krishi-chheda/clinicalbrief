@@ -8,6 +8,7 @@ import { SplitText } from "gsap/SplitText";
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
 import { useGSAP } from "@gsap/react";
 import { SiteHeader, Mono } from "./kit";
+import TryDemoButton from "./TryDemoButton";
 
 gsap.registerPlugin(useGSAP, SplitText, DrawSVGPlugin);
 
@@ -24,6 +25,7 @@ export interface LoginPageProps {
   onPasswordChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   error: string | null;
+  onTryDemo?: (captchaToken?: string) => Promise<string | null>;  // anonymous read-only demo (no account needed)
 }
 
 const POINTS = [
@@ -36,7 +38,7 @@ const ROLES = ["clinician", "consultant", "coder", "auditor", "researcher", "adm
 
 const INPUT = "mt-2 w-full rounded-md border border-[#B3C5A0] bg-white px-3.5 py-3 text-[15px] text-[#090F05] outline-none transition-[border-color,box-shadow] duration-200 hover:border-[#4A5B38] focus:border-[#3F7308] focus:ring-2 focus:ring-[#B2EB76]";
 
-export default function LoginPage({ email, onEmailChange, password, onPasswordChange, onSubmit, error }: LoginPageProps) {
+export default function LoginPage({ email, onEmailChange, password, onPasswordChange, onSubmit, error, onTryDemo }: LoginPageProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Entrance + ambient ECG loop.
@@ -114,6 +116,18 @@ export default function LoginPage({ email, onEmailChange, password, onPasswordCh
                 Sign in <ArrowRight className="h-4 w-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
               </button>
             </form>
+
+            {onTryDemo && (
+              <div className="mt-6 border-t border-[#B3C5A0]/60 pt-6 text-center">
+                <p className="text-sm text-[#4A5B38]">No account? Look around with 10 synthetic patients, read-only.</p>
+                <div className="mt-3">
+                  <TryDemoButton onStart={onTryDemo}
+                    className="inline-flex items-center gap-2 rounded-md border border-[#18280E] px-4 py-2.5 lp-mono text-[13px] uppercase tracking-[0.12em] text-[#18280E] hover:bg-[#F4FAED]">
+                    Try the demo
+                  </TryDemoButton>
+                </div>
+              </div>
+            )}
 
             <Link href="/" className="mt-8 inline-flex items-center gap-1.5 py-1.5 lp-mono text-[12px] uppercase tracking-[0.12em] text-[#4A5B38] hover:text-[#090F05]">
               <ArrowLeft className="h-3.5 w-3.5" /> Back to the product page

@@ -78,6 +78,25 @@ the build cache**. Check: the live bundle must contain the Render URL, not `loca
 - Sign in; open **System health** (admin or auditor): **Database: Working**, **Local AI model: Unavailable**
   (expected online, see below), the search index count matches the processed notes.
 
+## 6. Public demo (optional)
+
+1. **Supabase → SQL Editor:** run `clinicalbrief-backend/migrations/0012_public_demo.sql` (adds `patients.is_demo`, the
+   `demo` role and the anonymous-sign-in trigger; existing roles keep exactly their access).
+2. **Flag the patients** (dry run first, then apply):
+
+```powershell
+$env:CLINICALBRIEF_ALLOW_REMOTE_DB = "1"; py -3.12 -m app.cli flag-demo
+$env:CLINICALBRIEF_ALLOW_REMOTE_DB = "1"; py -3.12 -m app.cli flag-demo --apply
+```
+
+3. **Supabase → Authentication → Rate Limits:** keep anonymous sign-ins low (about 30 per hour per IP).
+4. **Supabase → Authentication → Sign In / Providers:** enable **anonymous sign-ins**.
+5. **CAPTCHA (recommended, currently off on the live demo):** create a Cloudflare Turnstile widget (hostnames: the
+   Vercel domain and `localhost`). Put the **secret** key in Supabase → Authentication → Attack Protection, and the
+   **site** key in Vercel as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, then redeploy without the build cache. Turning CAPTCHA
+   on without the site key in Vercel breaks "Try the demo" (Supabase refuses sign-ins without a token).
+6. **Clean-up** (weekly, SQL Editor): `delete from auth.users where is_anonymous and created_at < now() - interval '7 days';`
+
 ## What is different online (and said so on the site)
 
 - **Copilot** gives its labelled rule-based answers: the hosted API cannot reach a local model, and the app only

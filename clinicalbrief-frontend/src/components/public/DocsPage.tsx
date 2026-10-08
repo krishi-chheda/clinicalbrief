@@ -110,6 +110,7 @@ const ROLES: [string, string, string][] = [
   ["coder", "all", "review/edit AI output (codes)"],
   ["auditor", "all (read-only)", "nothing; can read audit log, governance and import history"],
   ["researcher", "all (read-only)", "nothing (a de-identified view is planned)"],
+  ["demo", "only patients flagged for the public demo (read-only)", "nothing; Copilot only, private sessions. Anonymous sign-in"],
 ];
 
 // --- Motion ----------------------------------------------------------------------------------------------------
@@ -204,7 +205,7 @@ export default function DocsPage() {
                   <div className="rounded-2xl border border-[#B3C5A0]/60 p-5">
                     <Mono className="text-[#4A5B38]">Frontend .env.local</Mono>
                     <ul className="mt-2 space-y-1 lp-mono text-[13px] break-all">
-                      {["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_API_URL"].map(v => <li key={v}>{v}</li>)}
+                      {["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_TURNSTILE_SITE_KEY (optional, public demo CAPTCHA)"].map(v => <li key={v}>{v}</li>)}
                     </ul>
                   </div>
                 </div>
@@ -242,7 +243,8 @@ py -3.12 -m app.cli ask <patient_id> "<question>"`}</Cmd>
 py -3.12 -m app.cli import synthea <path>         [--dry-run] [--limit N]
 py -3.12 -m app.cli runs                                    # import history with counts and rejected records
 py -3.12 -m app.cli process-notes --limit N                 # run the AI pipeline on unprocessed notes
-py -3.12 -m app.cli set-role <email> <role>`}</Cmd>
+py -3.12 -m app.cli set-role <email> <role>
+py -3.12 -m app.cli flag-demo [--count 10] [--apply]        # choose the public demo patients (dry run by default)`}</Cmd>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Record ids are derived from <C>(source_system, table, source_id)</C>, so re-importing updates rows instead of duplicating them.</li>
                   <li>Invalid source records are skipped and written to <C>import_errors</C> with a reason; the rest continues.</li>
@@ -273,7 +275,7 @@ py -3.12 -m app.cli set-role <email> <role>`}</Cmd>
                 <p className="text-sm text-[#4A5B38]">Responses may carry <C>X-Total-Count</C> (full size of a limited list), <C>X-Pending-Entities</C> (AI findings awaiting review) and <C>X-FHIR-Validation</C> (the export check result).</p>
               </DocSection>
 
-              <DocSection id="roles" label="Security model" title="Six roles, enforced twice.">
+              <DocSection id="roles" label="Security model" title="Six roles and a demo, enforced twice.">
                 <p>The API enforces roles, and Postgres row-level security mirrors them for anything a browser could call directly with the publishable key: clinical tables are read-only to clients, users cannot change their own role, and clients cannot write audit entries. All writes go through the API. Roles are never taken from signup metadata.</p>
                 <div className="overflow-x-auto rounded-2xl border border-[#B3C5A0]/60">
                   <table className="w-full min-w-[560px] text-sm">

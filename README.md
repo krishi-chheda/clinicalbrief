@@ -13,6 +13,8 @@ of every AI output.
 
 - The public pages (product, security, data, roadmap, docs) need no account. The workspace needs a sign-in, and new
   accounts start as `pending` with no access until an admin grants a role.
+- **Try the demo** (landing and sign-in pages): an anonymous, read-only session that sees only the 10 synthetic patients
+  flagged for the demo (role `demo`, migration `0012`). No account or password. See [Public demo](#public-demo).
 - **Copilot online gives its labelled rule-based answers**: the hosted API cannot reach a local model, and patient data
   is only ever sent to a model on the same machine. Run it locally with Ollama for model answers.
 - The API is on Render's free plan: after 15 idle minutes it sleeps, and the first request takes ~30-60 s.
@@ -24,7 +26,7 @@ of every AI output.
 | Canonical clinical model | **Implemented** | Patients, encounters, notes, diagnoses, medications, allergies, procedures, observations. Every record carries `source_system`, `source_id`, `provenance`. |
 | Data ingestion | **Implemented** | Synthea FHIR R4 adapter; dry run, per-record validation, rejected-record log, idempotent re-import, run history. |
 | Auth | **Implemented** | Supabase Auth; backend verifies tokens (JWKS or legacy HS256, audience + expiry). |
-| Authorization | **Implemented** | Six roles enforced in the API and mirrored in Postgres row-level security (see below). |
+| Authorization | **Implemented** | Six roles, plus a read-only `demo` role for the public sandbox, enforced in the API and mirrored in Postgres row-level security (see below). |
 | Human review + audit | **Implemented** | Cross-patient **review queue** (`/review`): AI findings with their evidence sentence, approve / reject / edit, bulk approve per note, undo, keyboard shortcuts. Decisions are all-or-nothing, refused (409) if someone else changed the finding meanwhile, and each writes `review_history` plus an audit row. AI output is never treated as fact until a person approves or edits it: the graph, FHIR export, Copilot structured answers and the risk score use **reviewed entities only** and report how many are pending. **Governance** page (`/governance`, admin and auditor): pending count and age, decisions by type, extraction method and reviewer, latest decisions. All live counts; rates are shares of human decisions, not accuracy. |
 | AI note pipeline | **Prototype** | Default mode (`USE_MOCK_MODELS=true`) is rule-based: whole-word dictionary matching (~60 terms) with NegEx-style negation ("no history of", "denies", "ruled out", scoped by "but"/";" and ended by affirmations such as "positive for", "reports"), a family-history check ("family history of", "mother had …" are not attributed to the patient), "allergic to X" treated as an allergy, and an **extractive** summary (sentences copied from the note). It has no calibrated confidence, so confidence is **null**, not a number. Re-processing is idempotent (one transaction; stale runs retryable). Transformer mode exists but is untested. |
 | ICD-10 suggestions | **Prototype** | Exact match against a 17-entry dictionary; anything else stays **unmapped** (no default code). Suggestions only, for human review. |
@@ -186,6 +188,7 @@ py -3.12 -m app.cli import synthea <path>         [--dry-run] [--limit N]
 py -3.12 -m app.cli runs                                    # import history with counts and rejected records
 py -3.12 -m app.cli process-notes --limit N                 # run the AI pipeline on unprocessed notes
 py -3.12 -m app.cli set-role <email> <role>
+py -3.12 -m app.cli flag-demo [--count 10] [--apply]        # choose the public demo patients (dry run by default)
 ```
 
 - Record ids are derived from `(source_system, table, source_id)`, so re-importing updates rows instead of duplicating them.
@@ -204,6 +207,7 @@ py -3.12 -m app.cli set-role <email> <role>
 | coder | all | review/edit AI output (codes) |
 | auditor | all (read-only) | nothing; can read audit log, governance and import history |
 | researcher | all (read-only) | nothing (a de-identified view is planned) |
+| demo | only patients flagged `is_demo` (read-only) | nothing; Copilot only (its own sessions). Public sandbox, see below |
 
 FHIR export is limited to admin, clinician, consultant and coder.
 
@@ -212,9 +216,32 @@ FHIR export is limited to admin, clinician, consultant and coder.
   **read-only** to clients, users cannot change their own role, and audit entries cannot be written by clients.
   All writes go through the API.
 - Roles are never taken from signup metadata; new accounts get `pending`, which has no access (every endpoint answers 403) until an admin runs `set-role` (migration `0009`).
+- The only automatic role is `demo`, for **anonymous** sign-ins (migration `0012`); see [Public demo](#public-demo).
 - Reads of clinical data are audited: viewing a patient's record (`view_record`), note text (`view_note_text`), note AI output and its evidence sentences (`view_note_insights`) and Copilot questions (`copilot_query`, `copilot_query_cli`) log who and which id, never the content. The audit log is served in pages (`limit` ≤ 500, `X-Total-Count`).
 - Uploads: UTF-8 `.txt` only, max 5 MB, stored under a server-generated name (the client filename is display-only).
 - Storage buckets are private. CORS is restricted to configured origins.
+
+## Public demo
+
+"Try the demo" signs a visitor in **anonymously** (Supabase anonymous sign-ins). The signup trigger gives anonymous
+accounts the role `demo` (everyone else still gets `pending`); anonymous users have no email, so the profile stores a
+placeholder on the reserved `.invalid` domain.
+
+- **Scope:** `demo` sees only patients with `is_demo = true`, in the API (`deps.py`) and in RLS (the patients policy;
+  child tables follow). Any other patient is a 404. Assigning a patient to a demo account does not widen this.
+- **Read-only:** uploads, review, processing, FHIR export, audit, imports, ops and governance all answer 403. Copilot is
+  allowed; its sessions are private to the visitor, and online it gives the labelled rule-based answers. Demo patients'
+  note text is synthetic and shown in full.
+- **Choosing the patients:** `flag-demo` picks Synthea patients with at least two analysed notes, conditions,
+  medications and lab results, ranked by reviewed AI findings; `--apply` makes exactly those the demo patients.
+- **Abuse protection:** Supabase rate-limits anonymous sign-ins per IP. CAPTCHA is supported (Cloudflare Turnstile,
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) but **not enabled on the live demo yet**.
+- **Clean-up:** anonymous accounts accumulate. Delete those older than a week in the Supabase SQL editor; their profile,
+  Copilot sessions and layout go with them, and their audit rows stay with the user id cleared:
+
+```sql
+delete from auth.users where is_anonymous and created_at < now() - interval '7 days';
+```
 
 ## Tests
 
@@ -242,6 +269,10 @@ git config core.hooksPath .githooks
 Frontend: `npx tsc --noEmit`, `npm run build`, `npm audit --omit=dev`. No linter is configured yet (backend or frontend).
 
 ## Known gaps
+
+- The public demo has **no CAPTCHA** yet: only Supabase's per-IP rate limit on anonymous sign-ins protects it, and old
+  anonymous accounts are removed by hand (see [Public demo](#public-demo)). Every visitor gets the same 10 synthetic
+  patients and cannot change anything.
 
 - The rule-based extractor's vocabulary is small (~60 terms), and on Synthea's templated notes the extractive
   summary often consists of list items. Neither has been evaluated against labelled data.

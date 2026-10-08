@@ -93,6 +93,7 @@ const LIMITS: { title: string; body: string }[] = [
   { title: "Redaction is regex only", body: "PHI redaction matches patterns (dates, US and Australian phone numbers, emails, record and insurance numbers). It is not a validated de-identification method; names, addresses and Medicare numbers are not detected." },
   { title: "Some outputs are not de-identified", body: "Only the note-text view is redacted. Copilot citations, entity evidence sentences and patient demographics are shown as stored." },
   { title: "Copilot sessions are hard-deleted", body: "Deleting a session removes the transcript permanently; what the AI said cannot be reconstructed. The audit log keeps who deleted it, for which patient. A clinical deployment would need retention instead." },
+  { title: "The public demo has no CAPTCHA yet", body: "Anyone can start a demo session. Anonymous sign-ins are rate-limited per IP by Supabase, and old anonymous accounts are deleted by hand. Visitors see the same 10 synthetic patients, read-only." },
   { title: "A prototype, not a certified system", body: "No certification, compliance audit or penetration test has been done. It is a research and portfolio project, not a medical device, and runs on synthetic data only." },
 ];
 
@@ -160,9 +161,10 @@ export default function SecurityPage() {
           <Card icon={KeyRound} title="Authentication">
             <p>Sign-in uses Supabase Auth. The backend verifies every token itself (JWKS or legacy HS256), checking audience and expiry.</p>
             <p>New accounts start as <code className="lp-mono text-[13px]">pending</code>: every endpoint answers 403 until an admin assigns a role from the command line. Roles are never taken from signup data.</p>
+            <p>The one exception is <strong>Try the demo</strong>: an anonymous sign-in gets the read-only <code className="lp-mono text-[13px]">demo</code> role, which sees only the synthetic patients flagged for the demo and cannot change anything.</p>
           </Card>
           <Card icon={Users} title="Authorization">
-            <p>Six roles are enforced in the API and mirrored in Postgres row-level security, so the browser&apos;s public key cannot read or write past them. Clinical tables are read-only to clients; all writes go through the API.</p>
+            <p>Six roles, plus the public <code className="lp-mono text-[13px]">demo</code> role, are enforced in the API and mirrored in Postgres row-level security, so the browser&apos;s public key cannot read or write past them. Clinical tables are read-only to clients; all writes go through the API.</p>
             <p>&quot;Not yours&quot; and &quot;doesn&apos;t exist&quot; both return 404, so record ids cannot be probed.</p>
           </Card>
         </div>

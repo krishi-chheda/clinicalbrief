@@ -6,7 +6,13 @@
 "use client";
 import React, { useRef, useState } from "react";
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+// Real Turnstile site keys look like "0x4AAAA..." (Cloudflare's test keys "1x0000...", "2x...", "3x..."). Anything else,
+// e.g. a placeholder left in the hosting settings, would fail every check, so it counts as "not set".
+const RAW_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
+const SITE_KEY = RAW_KEY && /^[0-3]x[0-9A-Za-z_-]{10,}$/.test(RAW_KEY) ? RAW_KEY : undefined;
+if (RAW_KEY && !SITE_KEY && typeof window !== "undefined") {
+  console.warn("NEXT_PUBLIC_TURNSTILE_SITE_KEY is not a Turnstile site key; the demo runs without a CAPTCHA check.");
+}
 
 type Turnstile = { render: (el: HTMLElement, opts: Record<string, unknown>) => string };
 declare global { interface Window { turnstile?: Turnstile } }

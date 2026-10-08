@@ -182,3 +182,15 @@ def test_flag_demo_dry_run_then_apply(client, demo, world, tmp_path, capsys):
         db.query(Patient).filter(Patient.patient_id.in_(before)).update({Patient.is_demo: True}, synchronize_session=False)
         db.commit()
         db.close()
+
+
+@pytest.mark.parametrize("argv", [["flag-demo"], ["runs"]])
+def test_cli_main_runs_commands_that_skip_the_target_banner(client, argv, capsys):
+    """Regression: main() re-imported is_sqlite inside an `if`, so commands that skip that block crashed
+    (UnboundLocalError) before doing anything - e.g. a `flag-demo` dry run."""
+    from app.cli import main
+    try:
+        main(argv)
+    except SystemExit:
+        pass  # flag-demo exits when no patient qualifies; reaching it means main() got past the bug
+    capsys.readouterr()

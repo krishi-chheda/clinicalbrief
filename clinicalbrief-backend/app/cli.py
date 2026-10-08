@@ -123,7 +123,7 @@ def main(argv=None):
     p.add_argument("--count", type=int, default=10); p.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
     if (args.cmd in ("import", "process-notes", "set-role", "ask") and not getattr(args, "dry_run", False)) or             (args.cmd == "flag-demo" and args.apply):
-        from app.core.database import db_host, is_remote, is_sqlite
+        from app.core.database import db_host, is_remote  # is_sqlite is the module-level import
         target = "local SQLite" if is_sqlite else f"{'REMOTE' if is_remote else 'local'} Postgres at {db_host}"
         print(f"Target database: {target}", file=sys.stderr)
 

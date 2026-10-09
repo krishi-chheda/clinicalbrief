@@ -79,3 +79,9 @@ def test_failed_database_check_hides_connection_details(client, auth, monkeypatc
     assert body["status"] == "down" and db["ok"] is False
     assert "example.invalid" not in str(body) and "postgres.abc" not in str(body)
     assert db["detail"] == "OperationalError: check failed (details in the backend log)"
+
+
+def test_root_reports_the_deployed_commit(client, monkeypatch):
+    assert client.get("/").json()["commit"] == "local"
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "1a88d5b0123456789abcdef")
+    assert client.get("/").json()["commit"] == "1a88d5b"

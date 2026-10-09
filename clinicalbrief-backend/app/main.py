@@ -96,5 +96,7 @@ def read_root():
         "version": settings.VERSION,
         # Tells the UI what actually produced AI output, so it never claims transformer models it isn't running.
         "ai_mode": "rule-based-prototype" if ai_orchestrator.use_mock else "transformers",
+        # Which code is live: Render sets RENDER_GIT_COMMIT for each deploy; locally it is "local".
+        "commit": os.environ.get("RENDER_GIT_COMMIT", "")[:7] or "local",
         "docs_url": "/docs"
     }

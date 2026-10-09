@@ -1425,7 +1425,9 @@ export default function ClinicalBriefApp() {
     const res = await fetchProfile(accessToken);
     if (!res?.ok) {
       await supabase.auth.signOut();
-      return res?.status === 403 ? noRoleMessage : "Signed in, but your ClinicalBrief profile could not be loaded.";
+      if (res?.status === 403) return noRoleMessage;
+      // The status (or "no response": network, CORS or the API waking up) is what tells these failures apart.
+      return `Signed in, but your ClinicalBrief profile could not be loaded (${res ? `HTTP ${res.status}` : "no response from the API"}).`;
     }
     const profile = await res.json();
     setUserRole(profile.role);

@@ -13,8 +13,8 @@ of every AI output.
 
 - The public pages (product, security, data, roadmap, docs) need no account. The workspace needs a sign-in, and new
   accounts start as `pending` with no access until an admin grants a role.
-- **Try the demo** (landing and sign-in pages): an anonymous, read-only session that sees only the 10 synthetic patients
-  flagged for the demo (role `demo`, migration `0012`). No account or password. See [Public demo](#public-demo).
+- A public **Try the demo** sandbox (anonymous, read-only, 10 flagged synthetic patients) is built but **switched off**
+  for now: its buttons only appear when the frontend is built with `NEXT_PUBLIC_DEMO_ENABLED=true`. See [Public demo](#public-demo).
 - **Copilot online gives its labelled rule-based answers**: the hosted API cannot reach a local model, and patient data
   is only ever sent to a model on the same machine. Run it locally with Ollama for model answers.
 - The API is on Render's free plan: after 15 idle minutes it sleeps, and the first request takes ~30-60 s.
@@ -223,6 +223,10 @@ FHIR export is limited to admin, clinician, consultant and coder.
 
 ## Public demo
 
+**Status: built, switched off.** The buttons are hidden unless the frontend is built with `NEXT_PUBLIC_DEMO_ENABLED=true`;
+the backend, migration `0012` and tests stay in place. On the live site the API answered 403 to demo profiles that had
+the right role; that is not yet explained, so the demo stays off until it is.
+
 "Try the demo" signs a visitor in **anonymously** (Supabase anonymous sign-ins). The signup trigger gives anonymous
 accounts the role `demo` (everyone else still gets `pending`); anonymous users have no email, so the profile stores a
 placeholder on the reserved `.invalid` domain.
@@ -270,9 +274,8 @@ Frontend: `npx tsc --noEmit`, `npm run build`, `npm audit --omit=dev`. No linter
 
 ## Known gaps
 
-- The public demo has **no CAPTCHA** yet: only Supabase's per-IP rate limit on anonymous sign-ins protects it, and old
-  anonymous accounts are removed by hand (see [Public demo](#public-demo)). Every visitor gets the same 10 synthetic
-  patients and cannot change anything.
+- The public demo is switched off (see [Public demo](#public-demo)). When it is turned on: there is no CAPTCHA yet
+  (only Supabase's per-IP rate limit on anonymous sign-ins), and old anonymous accounts are removed by hand.
 
 - The rule-based extractor's vocabulary is small (~60 terms), and on Synthea's templated notes the extractive
   summary often consists of list items. Neither has been evaluated against labelled data.

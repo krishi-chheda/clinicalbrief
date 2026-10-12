@@ -78,7 +78,11 @@ the build cache**. Check: the live bundle must contain the Render URL, not `loca
 - Sign in; open **System health** (admin or auditor): **Database: Working**, **Local AI model: Unavailable**
   (expected online, see below), the search index count matches the processed notes.
 
-## 6. Public demo (optional)
+## 6. Public demo (optional, currently off)
+
+The buttons only appear when Vercel builds with `NEXT_PUBLIC_DEMO_ENABLED=true` (then redeploy without the build
+cache). While it is off, also keep **anonymous sign-ins disabled** in Supabase: the API would still accept demo accounts
+created directly with the public key.
 
 1. **Supabase → SQL Editor:** run `clinicalbrief-backend/migrations/0012_public_demo.sql` (adds `patients.is_demo`, the
    `demo` role and the anonymous-sign-in trigger; existing roles keep exactly their access).

@@ -89,6 +89,9 @@ function filterPatients(patients: Patient[], query: string, source: string, with
     (!withNotesOnly || (p.document_count ?? 0) > 0));
 }
 
+// Public "Try the demo" entry points (landing and sign-in pages). Off unless set to "true" at build time.
+const DEMO_ENABLED = process.env.NEXT_PUBLIC_DEMO_ENABLED === "true";
+
 // Knowledge graph node types, in drawing order (one sector each). Colours are distinct and readable on light and dark.
 const GRAPH_TYPES = [
   { type: "Condition", plural: "Conditions", color: "#DC2626" },
@@ -1437,6 +1440,7 @@ export default function ClinicalBriefApp() {
   };
 
   // "Try the demo": anonymous sign-in; the signup trigger gives anonymous users the read-only `demo` role.
+  // Hidden unless NEXT_PUBLIC_DEMO_ENABLED=true (switched off for now; the backend, migration 0012 and tests stay).
   const handleTryDemo = async (captchaToken?: string): Promise<string | null> => {
     if (!isBackendOnline) return "The ClinicalBrief API is unreachable right now. Please try again in a minute.";
     const { data, error } = await supabase.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
@@ -1578,7 +1582,7 @@ export default function ClinicalBriefApp() {
   // --- Views ---
 
   const renderLogin = () => (
-    <LoginPage onTryDemo={handleTryDemo} email={userEmail} onEmailChange={setUserEmail} password={password} onPasswordChange={setPassword}
+    <LoginPage onTryDemo={DEMO_ENABLED ? handleTryDemo : undefined} email={userEmail} onEmailChange={setUserEmail} password={password} onPasswordChange={setPassword}
       onSubmit={handleLogin} error={loginError} />
   );
 
@@ -2925,7 +2929,7 @@ export default function ClinicalBriefApp() {
   );
 
   // Router dispatcher
-  if (currentView === "landing") return <Landing onSignIn={() => setCurrentView("login")} onTryDemo={handleTryDemo} />;
+  if (currentView === "landing") return <Landing onSignIn={() => setCurrentView("login")} onTryDemo={DEMO_ENABLED ? handleTryDemo : undefined} />;
   if (INFO_VIEWS.includes(currentView)) return <InfoPage view={currentView} />;
   if (currentView === "login") return renderLogin();
   if (!authReady) {

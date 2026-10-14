@@ -1,6 +1,7 @@
 "use client";
 // Shared presentational components.
 import React from "react";
+import CopilotThinking from "./CopilotThinking";
 import {
   Activity,
   FileText,
@@ -328,6 +329,11 @@ export const CopilotMessageView: React.FC<{ msg: any; onAsk?: (q: string) => voi
           </div>
         )}
       </div>
+      {isAssistant && (msg.steps?.length > 0 || msg.answered_only) && (
+        <CopilotThinking steps={msg.steps || []} running={false} totalMs={msg.answered_only ? msg.answered_ms : msg.total_ms}
+          answeredOnly={!!msg.answered_only} grounding={grounding?.label ?? (msg.mode === "rule-based" ? "rule-based fallback" : null)}
+          sources={citations.length} citedIds={cited} onChip={toggle} />
+      )}
       <div className="space-y-1 leading-relaxed">
         {String(msg.content).split("\n").filter((l: string) => l.trim()).map((line: string, idx: number) =>
           /^\s*[-*•]\s+/.test(line)

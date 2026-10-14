@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
 import logging
+import queue
+import threading
 import uuid
 import datetime
 
@@ -73,16 +77,83 @@ def delete_conversation(
     current_user: User = Depends(get_current_user)
 ):
     """Deletes one of the caller's own conversations (others' are 404, never revealed)."""
-    conversation = db.query(CopilotConversation).filter(
-        CopilotConversation.conversation_id == conversation_id,
-        CopilotConversation.user_id == current_user.id,
-    ).first()
+    conversation = _find_own(db, conversation_id, current_user)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation session not found")
     db.add(AuditLog(user_id=current_user.id, action_type="copilot_conversation_deleted",
                     extraction_source=f"Patient ID: {conversation.patient_id}"))
     db.delete(conversation)
     db.commit()
+
+def _find_own(db: Session, conversation_id: str, user: User) -> Optional[CopilotConversation]:
+    try:
+        uuid.UUID(conversation_id)  # Postgres rejects a malformed uuid with an error (500); it is simply not found
+    except ValueError:
+        return None
+    return db.query(CopilotConversation).filter(
+        CopilotConversation.conversation_id == conversation_id,
+        CopilotConversation.user_id == user.id,
+    ).first()
+
+
+def _own_conversation(db: Session, conversation_id: str, user: User) -> CopilotConversation:
+    """The caller's own conversation on a patient they may still see; anything else is 404, never revealed."""
+    conversation = _find_own(db, conversation_id, user)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
+    # Patient access may have been revoked since the conversation started.
+    get_accessible_patient(conversation.patient_id, db, user)
+    return conversation
+
+
+def _answer(db: Session, conversation: CopilotConversation, content: str, user_id: str, trace):
+    """Stores the question, answers it, audits it and stores the answer with its trace (shared by /chat and /stream).
+    Returns (assistant message dict, suggested questions)."""
+    from app.services.grounded_copilot import grounded_answer
+    from app.services.llm import LLMUnavailable
+
+    now = lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
+    user_msg = {"message_id": str(uuid.uuid4()), "conversation_id": conversation.conversation_id, "sender": "user",
+                "content": content, "citations": json.dumps([]), "confidence": 1.0, "timestamp": now()}
+    conversation.messages = list(conversation.messages) + [user_msg]
+    db.commit()
+
+    # Grounded answer from the LOCAL model; rule-based fallback only if it is unavailable.
+    try:
+        result = grounded_answer(db, conversation.patient_id, content, trace=trace)
+        answer, citations_list, confidence = result["answer"], result["citations"], None
+        mode, grounding, warnings = result["mode"], result["grounding"], result["warnings"]
+        search_terms = result.get("search_terms") or []
+        suggested_questions = ["What are the active diagnoses?", "What medications is the patient on?",
+                               "What were the most recent lab results?"]
+    except LLMUnavailable as e:
+        logger.warning(f"Local LLM unavailable, using rule-based fallback: {e}")
+        # The stage that needed the model (expand, generate, or the final check) ends here as a dead end.
+        trace.dead(trace.active or "llm", "Local model unavailable: using the rule-based answers")
+        trace.start("fallback", "Answering with the rule-based fallback")
+        answer, citations_list, confidence, suggested_questions, did = _rule_based_answer(db, conversation.patient_id, content)
+        trace.done("fallback", did)
+        mode, grounding, warnings = "rule-based", None, [f"Local LLM unavailable ({e}). Answered by the rule-based fallback."]
+        search_terms = []
+
+    # Audit the access, never the question or answer text.
+    db.add(AuditLog(user_id=user_id, action_type="copilot_query", model_used=mode[:100],
+                    extraction_source=f"Patient ID: {conversation.patient_id}; grounding: {grounding}"))
+    assistant_msg = {
+        "message_id": str(uuid.uuid4()), "conversation_id": conversation.conversation_id, "sender": "assistant",
+        "content": answer, "citations": json.dumps(citations_list), "confidence": confidence,
+        "mode": mode, "grounding": grounding, "warnings": warnings, "search_terms": search_terms,
+        "steps": trace.steps, "total_ms": trace.total_ms(), "timestamp": now(),
+    }
+    conversation.messages = list(conversation.messages) + [assistant_msg]
+    db.commit()
+    return assistant_msg, suggested_questions
+
+
+def _response(msg: dict, suggested_questions: list[str]) -> CopilotMessageResponse:
+    return CopilotMessageResponse(**{**msg, "timestamp": datetime.datetime.fromisoformat(msg["timestamp"]),
+                                     "suggested_questions": suggested_questions})
+
 
 @router.post("/chat/{conversation_id}", response_model=CopilotMessageResponse)
 def send_copilot_message(
@@ -91,91 +162,59 @@ def send_copilot_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Submits a chat message, retrieves semantic context, and formulates response."""
-    conversation = db.query(CopilotConversation).filter(
-        CopilotConversation.conversation_id == conversation_id,
-        CopilotConversation.user_id == current_user.id,
-    ).first()
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation session not found")
+    """Answers one question in a conversation (the whole answer at once; /stream reports the stages live)."""
+    from app.services.grounded_copilot import StepTrace
+    conversation = _own_conversation(db, conversation_id, current_user)
+    return _response(*_answer(db, conversation, payload.content, current_user.id, StepTrace()))
 
-    # Patient access may have been revoked since the conversation started.
-    get_accessible_patient(conversation.patient_id, db, current_user)
 
-    # 1. Store User Message
-    user_msg = {
-        "message_id": str(uuid.uuid4()),
-        "conversation_id": conversation_id,
-        "sender": "user",
-        "content": payload.content,
-        "citations": json.dumps([]),
-        "confidence": 1.0,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-    }
+@router.post("/chat/{conversation_id}/stream")
+def stream_copilot_message(
+    conversation_id: str,
+    payload: CopilotMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """F-01: the same answer as /chat, with each real pipeline stage streamed as it starts and finishes.
 
-    current_msgs = list(conversation.messages)
-    current_msgs.append(user_msg)
-    conversation.messages = current_msgs
-    db.commit()
+    Newline-delimited JSON: {"type": "step", ...} events (see StepTrace), then one {"type": "final", "message": ...}
+    with the stored message (same shape as /chat), or {"type": "error", "detail": ...}. Access is checked before
+    anything is streamed, so a foreign or missing conversation is a plain 404.
+    """
+    from app.core.database import SessionLocal
+    from app.services.grounded_copilot import StepTrace
+    _own_conversation(db, conversation_id, current_user)
+    user_id, content = current_user.id, payload.content
+    events: queue.Queue = queue.Queue()
 
-    # 2. Grounded answer from the LOCAL model; rule-based fallback only if it is unavailable.
-    from app.services.grounded_copilot import grounded_answer
-    from app.services.llm import LLMUnavailable
-    try:
-        result = grounded_answer(db, conversation.patient_id, payload.content)
-        answer, citations_list, confidence = result["answer"], result["citations"], None
-        mode, grounding, warnings = result["mode"], result["grounding"], result["warnings"]
-        search_terms = result.get("search_terms") or []
-        suggested_questions = ["What are the active diagnoses?", "What medications is the patient on?",
-                               "What were the most recent lab results?"]
-    except LLMUnavailable as e:
-        logger.warning(f"Local LLM unavailable, using rule-based fallback: {e}")
-        answer, citations_list, confidence, suggested_questions = _rule_based_answer(db, conversation.patient_id, payload.content)
-        mode, grounding, warnings = "rule-based", None, [f"Local LLM unavailable ({e}). Answered by the rule-based fallback."]
-        search_terms = []
+    def work():
+        # Its own session: the request's session is not guaranteed to outlive the handler while the body streams.
+        s = SessionLocal()
+        try:
+            conversation = s.get(CopilotConversation, conversation_id)
+            msg, suggested = _answer(s, conversation, content, user_id, StepTrace(events.put))
+            events.put({"type": "final", "message": jsonable_encoder(_response(msg, suggested))})
+        except Exception:
+            logger.exception("Copilot stream failed")
+            events.put({"type": "error", "detail": "The answer could not be completed. Please try again."})
+        finally:
+            s.close()
+            events.put(None)
 
-    # Audit the access, never the question or answer text.
-    db.add(AuditLog(user_id=current_user.id, action_type="copilot_query", model_used=mode[:100],
-                    extraction_source=f"Patient ID: {conversation.patient_id}; grounding: {grounding}"))
+    threading.Thread(target=work, daemon=True).start()
 
-    # 3. Store Assistant Message in DB
-    assistant_msg = {
-        "message_id": str(uuid.uuid4()),
-        "conversation_id": conversation_id,
-        "sender": "assistant",
-        "content": answer,
-        "citations": json.dumps(citations_list),
-        "confidence": confidence,
-        "mode": mode,
-        "grounding": grounding,
-        "warnings": warnings,
-        "search_terms": search_terms,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-    }
-    current_msgs = list(conversation.messages)
-    current_msgs.append(assistant_msg)
-    conversation.messages = current_msgs
-    db.commit()
+    def body():
+        while (event := events.get()) is not None:
+            yield json.dumps(event) + "\n"
 
-    # 4. Map to Pydantic Response Model
-    return CopilotMessageResponse(
-        message_id=assistant_msg["message_id"],
-        conversation_id=assistant_msg["conversation_id"],
-        sender=assistant_msg["sender"],
-        content=assistant_msg["content"],
-        citations=assistant_msg["citations"],
-        confidence=assistant_msg["confidence"],
-        timestamp=datetime.datetime.fromisoformat(assistant_msg["timestamp"]),
-        suggested_questions=suggested_questions,
-        mode=mode,
-        grounding=grounding,
-        warnings=warnings,
-        search_terms=search_terms,
-    )
+    return StreamingResponse(body(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 def _rule_based_answer(db: Session, patient_id: str, content: str):
-    """Fallback when the local LLM is unavailable: keyword intents over reviewed entities + note search."""
+    """Fallback when the local LLM is unavailable: keyword intents over reviewed entities + note search.
+    Returns (answer, citations, confidence, suggested questions, what was done) - the last for the step trace."""
+    from app.services.grounded_copilot import _plural
     from app.models.models import Document, Entity, ICD10Mapping, Summary
     docs = db.query(Document).filter(Document.patient_id == patient_id).all()
     doc_ids = [d.document_id for d in docs]
@@ -197,6 +236,7 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
     citations_list = []
     confidence = None  # only retrieval-based answers carry a measured score
     suggested_questions = []
+    did = ""  # what this fallback actually did, in one line (F-01 trace)
 
     # Intent 1: Medications Query
     if any(word in q_lower for word in ["medication", "meds", "drug", "prescrib", "takes", "taking"]):
@@ -211,8 +251,10 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
                     "similarity": None  # structured lookup, not a similarity search
                 })
             answer = "Reviewed medications from the processed notes:\n" + "\n".join(med_list)
+            did = f"Listed {_plural(len(med_entities), 'reviewed medication')}"
         else:
             answer = nothing_reviewed("Medication", "medications")
+            did = "Looked for reviewed medications: none recorded"
         suggested_questions = [
             "Are there any allergies?",
             "What is the risk assessment score?"
@@ -231,8 +273,10 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
                     "similarity": None  # structured lookup, not a similarity search
                 })
             answer = "Reviewed allergies from the processed notes:\n" + "\n".join(all_list)
+            did = f"Listed {_plural(len(allergy_entities), 'reviewed allergy', 'reviewed allergies')}"
         else:
             answer = nothing_reviewed("Allergy", "allergies")
+            did = "Looked for reviewed allergies: none recorded"
         suggested_questions = [
             "List the active medications.",
             "What was the primary diagnosis?"
@@ -252,8 +296,10 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
                     "similarity": None  # structured lookup, not a similarity search
                 })
             answer = "Reviewed diagnoses from the processed notes:\n" + "\n".join(diag_list)
+            did = f"Listed {_plural(len(disease_entities), 'reviewed diagnosis', 'reviewed diagnoses')}"
         else:
             answer = nothing_reviewed("Disease", "diagnoses")
+            did = "Looked for reviewed diagnoses: none recorded"
         suggested_questions = [
             "What medications were prescribed?",
             "Summarize the clinical note."
@@ -272,8 +318,10 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
                     "similarity": None  # structured lookup, not a similarity search
                 })
             answer = "ICD-10 codes on reviewed diagnoses:\n" + "\n".join(code_list)
+            did = f"Listed {_plural(len(disease_entities), 'ICD-10 code')} on reviewed diagnoses"
         else:
             answer = nothing_reviewed("Disease", "diagnoses with ICD-10 codes")
+            did = "Looked for ICD-10 codes on reviewed diagnoses: none recorded"
         suggested_questions = [
             "What diagnoses were made?",
             "What was the treatment plan?"
@@ -285,6 +333,7 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
         if summaries:
             sum_list = [s.summary_text for s in summaries]
             answer = "Summaries of the processed notes (AI-generated, unreviewed):\n\n" + "\n\n".join(sum_list)
+            did = f"Collected {_plural(len(summaries), 'note summary', 'note summaries')}"
             for s in summaries:
                 citations_list.append({
                     "document_id": s.document_id,
@@ -293,6 +342,7 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
                 })
         else:
             answer = "No clinical summaries are currently recorded for this patient."
+            did = "Looked for note summaries: none recorded"
         suggested_questions = [
             "What diagnoses were made?",
             "What medications were prescribed?",
@@ -314,13 +364,15 @@ def _rule_based_answer(db: Session, patient_id: str, content: str):
             ans_res = qa_engine.answer_question(doc_id, content)
             answer = ans_res["answer"]
             confidence = ans_res["confidence"]
+            did = f"Searched the notes: {_plural(len(chunks), 'matching passage')}"
         else:
             answer = "I could not find matching clinical context inside the patient's records to address your question."
             confidence = None
+            did = "Searched the notes: nothing matched"
         suggested_questions = [
             "Summarize the patient's note.",
             "What medications is the patient taking?",
             "List all allergies."
         ]
 
-    return answer, citations_list, confidence, suggested_questions
+    return answer, citations_list, confidence, suggested_questions, did

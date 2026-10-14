@@ -190,6 +190,8 @@ class CopilotMessageResponse(BaseSchema):
     grounding: Optional[str] = None   # grounded | partial | no-evidence | withheld
     warnings: Optional[List[str]] = None
     search_terms: Optional[List[str]] = None  # terms the local model suggested for retrieval
+    steps: Optional[List[dict]] = None   # F-01: the real pipeline stages for this answer (StepTrace)
+    total_ms: Optional[int] = None       # measured time for the whole answer
 
 class CopilotConversationCreate(BaseSchema):
     title: str = Field(min_length=1, max_length=255)  # copilot_sessions.title is VARCHAR(255)

@@ -414,3 +414,8 @@ body {
 .ft-ascii-grid { display: grid; grid-auto-rows: 1.05em; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; line-height: 1.05; }
 .ft-ascii-grid > span { display: block; overflow: visible; white-space: pre; text-align: center; }
 
+/* Copilot thinking timeline (F-01): the step in progress shimmers; static under reduced motion. */
+.cb-think-shimmer { background: linear-gradient(90deg, currentColor 35%, rgba(178, 235, 118, .95) 50%, currentColor 65%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: cb-think 1.6s linear infinite; }
+@keyframes cb-think { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .cb-think-shimmer { animation: none; background: none; -webkit-text-fill-color: currentColor; } }

@@ -11,6 +11,8 @@
                evidence are flagged to the user.
 """
 import re
+import time
+from typing import Callable
 from dataclasses import dataclass, asdict
 
 from sqlalchemy.orm import Session
@@ -219,6 +221,7 @@ def verify_answer(answer: str, evidence: list[Evidence]) -> dict:
     answer = _PAREN_CITATION.sub(lambda m: f"[{m.group(1)}]", answer)
     draft = answer  # the model's full text, kept for the advice check (guard_untrusted_evidence)
     invalid, irrelevant, uncited, unsupported, cited = set(), 0, 0, set(), []
+    statements = 0  # claim sentences checked (F-01: reported as "Checked N statements: K cited")
     lead_ins: list[int] = []  # N-30: a lead-in line is kept only if a kept claim follows it
     unsupported_qualifiers: set[str] = set()
 
@@ -255,6 +258,7 @@ def verify_answer(answer: str, evidence: list[Evidence]) -> dict:
         ids = [x for m in _CITATION.finditer(sentence) for x in _ids(m.group(1))]
         cited.extend(ids)
         if is_claim:
+            statements += 1
             if not ids:
                 uncited += 1
                 sentence = ""  # never shown
@@ -273,13 +277,16 @@ def verify_answer(answer: str, evidence: list[Evidence]) -> dict:
     answer = re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]{2,}", " ", answer)).strip()
     cited = list(dict.fromkeys(cited))
 
+    stats = {"statements": statements, "kept": statements - uncited, "uncited": uncited,
+             "invalid": sorted(invalid), "irrelevant": irrelevant}
     warnings = [f"Removed a citation to {bad}, which is not one of the provided sources." for bad in sorted(invalid)]
     if irrelevant:
         warnings.append(f"Removed {irrelevant} citation(s) whose source did not match the statement.")
     if not cited:
         if "couldn't find evidence" in draft.lower() or "could not find evidence" in draft.lower():
-            return {"answer": REFUSAL, "cited": [], "grounding": "no-evidence", "warnings": warnings, "draft": draft}
-        return {"answer": REFUSAL, "cited": [], "grounding": "withheld", "draft": draft,
+            return {"answer": REFUSAL, "cited": [], "grounding": "no-evidence", "warnings": warnings, "draft": draft,
+                    "stats": stats}
+        return {"answer": REFUSAL, "cited": [], "grounding": "withheld", "draft": draft, "stats": stats,
                 "warnings": warnings + ["The model's answer was not supported by any cited source, so it was withheld."]}
     if uncited:
         warnings.append(f"{uncited} statement(s) removed: no source.")
@@ -287,7 +294,7 @@ def verify_answer(answer: str, evidence: list[Evidence]) -> dict:
         warnings.append(f"Number(s) {', '.join(sorted(unsupported))} do not appear in the cited sources.")
     if unsupported_qualifiers:
         warnings.append(f"Qualifier(s) {', '.join(sorted(unsupported_qualifiers))} do not appear in the cited sources.")
-    return {"answer": answer, "cited": cited, "draft": draft,
+    return {"answer": answer, "cited": cited, "draft": draft, "stats": stats,
             "grounding": "partial" if (uncited or unsupported or unsupported_qualifiers) else "grounded",
             "warnings": warnings}
 
@@ -351,29 +358,109 @@ def guard_untrusted_evidence(checked: dict, evidence: list[Evidence]) -> None:
                                    "Check the answer against the source note.")
 
 
-def grounded_answer(db: Session, patient_id: str, question: str, llm: LocalLLM = None) -> dict:
-    """Raises LLMUnavailable if the local model can't be used (caller falls back)."""
-    llm = llm or local_llm
+class StepTrace:
+    """The real stages of one Copilot answer, reported when they actually start and finish (F-01).
+
+    Every event is sent to `on_step` (the streaming endpoint) and the finished ones are kept in `steps`, which is
+    stored with the answer so a reopened conversation shows the same trace. Events carry only counts, labels and
+    this patient's search terms / evidence labels: nothing the answer itself could not show. Nothing is simulated:
+    no step exists unless the pipeline ran it, and every duration is measured.
+    status: "active" (started), "done" (finished), "dead" (a dead end: something removed, withheld or unavailable).
+    """
+
+    def __init__(self, on_step: Callable[[dict], None] | None = None):
+        self.on_step, self.steps, self.active = on_step, [], None
+        self._started: dict[str, float] = {}
+        self.t0 = time.perf_counter()
+
+    def _emit(self, event: dict) -> None:
+        if self.on_step:
+            self.on_step({"type": "step", **event})
+
+    def start(self, step_id: str, label: str) -> None:
+        self._started[step_id], self.active = time.perf_counter(), step_id
+        self._emit({"id": step_id, "status": "active", "label": label})
+
+    def done(self, step_id: str, label: str, chips: list[str] = (), more: int = 0, status: str = "done") -> None:
+        started = self._started.pop(step_id, None)
+        event = {"id": step_id, "status": status, "label": label,
+                 "ms": round((time.perf_counter() - started) * 1000) if started is not None else None,
+                 "chips": list(chips), "more": more}
+        if self.active == step_id:
+            self.active = None
+        self.steps.append(event)
+        self._emit(event)
+
+    def dead(self, step_id: str, label: str) -> None:
+        self.done(step_id, label, status="dead")
+
+    def total_ms(self) -> int:
+        return round((time.perf_counter() - self.t0) * 1000)
+
+
+def _plural(n: int, word: str, plural: str = None) -> str:
+    return f"{n} {word if n == 1 else (plural or word + 's')}"
+
+
+def _first(items: list[str], n: int) -> tuple[list[str], int]:
+    return items[:n], max(0, len(items) - n)
+
+
+# Evidence kinds grouped the way a clinician reads them, for "Found N records: ...".
+def _found_label(evidence: list[Evidence]) -> str:
+    groups = [("diagnosis", "diagnosis", "diagnoses"), ("medication", "medication", None), ("allergy", "allergy", "allergies"),
+              ("observation", "lab or vital result", None), ("encounter", "encounter", None),
+              ("AI-extracted", "reviewed AI finding", None), ("note:", "note passage", None)]
+    parts = [_plural(n, word, plural) for prefix, word, plural in groups
+             if (n := sum(e.kind.startswith(prefix) for e in evidence))]
+    return f"Found {_plural(len(evidence), 'record')}" + (f": {', '.join(parts)}" if parts else "")
+
+
+def grounded_answer(db: Session, patient_id: str, question: str, llm: LocalLLM = None, trace: StepTrace = None) -> dict:
+    """Raises LLMUnavailable if the local model can't be used (caller falls back). `trace` records the real stages."""
+    llm, trace = llm or local_llm, trace or StepTrace()
+    trace.start("expand", "Expanding your question with the local model")
     search_terms = expand_query(llm, question)
+    trace.done("expand", f"Expanded into {_plural(len(search_terms), 'search term')}", *_first(search_terms, 6))
+    trace.start("retrieve", "Searching this patient's record")
     evidence = build_evidence(db, patient_id, question, tuple(search_terms))
+    trace.done("retrieve", _found_label(evidence), *_first([f"{e.id} {e.text[:40]}" for e in evidence], 4))
     if not evidence:
         llm.check()  # still report an unusable model rather than silently answering
         return {"answer": REFUSAL, "citations": [], "grounding": "no-evidence", "warnings": [],
                 "mode": f"local-llm:{llm.model}", "evidence_count": 0, "search_terms": search_terms}
+    trace.start("generate", f"Writing an answer with {llm.model} (local)")
     raw = llm.chat([
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "<evidence>\n" + "\n".join(e.line() for e in evidence)
                                     + f"\n</evidence>\n\nQuestion: {question}"},
     ], max_tokens=ANSWER_MAX_TOKENS)
+    truncated = getattr(raw, "truncated", False)
+    trace.done("generate", "Drafted an answer" + (" (cut off at the length limit)" if truncated else ""))
+    trace.start("verify", "Checking every statement against its sources")
     checked = verify_answer(raw, evidence)
+    before = checked["grounding"]
     guard_untrusted_evidence(checked, evidence)
+    st = checked["stats"]
+    trace.done("verify", f"Checked {_plural(st['statements'], 'statement')}: {st['kept']} cited")
+    if st["uncited"]:
+        trace.dead("verify.uncited", f"Removed {_plural(st['uncited'], 'statement')} with no source")
+    for bad in st["invalid"]:
+        trace.dead(f"verify.invalid.{bad}", f"Removed a citation to {bad} (not provided)")
+    if st["irrelevant"]:
+        trace.dead("verify.irrelevant", f"Removed {_plural(st['irrelevant'], 'citation')} that did not match the statement")
+    if before == "withheld":
+        trace.dead("verify.withheld", "Draft withheld: no statement could be verified")
+    elif checked["grounding"] == "withheld":
+        trace.dead("verify.advice", "Draft withheld: treatment advice")
     if checked["grounding"] in ("no-evidence", "withheld"):
         records = records_instead_of_refusal(question, evidence)
         if records:
             checked["answer"], checked["cited"] = records
             checked["warnings"].append("The model did not give a supported answer; showing the matching records verbatim.")
             checked["grounding"] = "records-only"
-    if getattr(raw, "truncated", False):
+            trace.done("records", f"Showing {_plural(len(records[1]), 'matching record')} instead")
+    if truncated:
         checked["warnings"].append("The answer was cut off at the length limit and may be incomplete.")
     by_id = {e.id: e for e in evidence}
     return {

@@ -42,6 +42,8 @@ def get_current_user(
 
     user = db.query(User).filter(User.id == payload["sub"]).first()
     if not user or user.role not in ROLES:
+        # D-01 diagnosis (live demo 403): which of the two causes it was. Ids only, never clinical data.
+        logger.warning("403 at sign-in: %s for user %s", "no profile row" if not user else f"role={user.role!r}", payload["sub"])
         # 403 = "you are signed in, but have no ClinicalBrief access" - signing in again won't help.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

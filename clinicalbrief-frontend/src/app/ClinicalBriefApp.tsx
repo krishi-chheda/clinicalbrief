@@ -78,6 +78,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { DEFAULT_LAYOUTS, knownWidgets, WidgetConfig } from "../lib/layouts";
 import { Patient, Document, PatientRecord, ProcessingStatus, PIPELINE_STAGES, scoreLabel, shortCodeSystem, ICD10Mapping, Entity, Summary, ParsedMedication, ParsedAllergy, DocumentInsights, AuditLog, BACKEND_URL, fetchProfile } from "../lib/clinical";
 import { SortableWidgetProps, SortableWidget, ConfidenceBadge, MetricCard, InsightCard, GROUNDING_STYLE, CopilotMessageView } from "../components/ui";
+import CopilotThinking, { ThinkingStep } from "../components/CopilotThinking";
 
 // Search by (display or source) name or id; filter by source and whether the patient has notes.
 function filterPatients(patients: Patient[], query: string, source: string, withNotesOnly: boolean): Patient[] {
@@ -160,6 +161,8 @@ export default function ClinicalBriefApp() {
   const [explainEntity, setExplainEntity] = useState<Entity | null>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [copilotLoading, setCopilotLoading] = useState<boolean>(false);
+  // F-01: the live trace of the answer being produced (steps exactly as the backend streams them).
+  const [liveThinking, setLiveThinking] = useState<{ steps: ThinkingStep[]; startedAt: number } | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversation, setActiveConversation] = useState<any | null>(null);
   const [copilotInput, setCopilotInput] = useState<string>("");
@@ -1051,7 +1054,7 @@ export default function ClinicalBriefApp() {
               {activeConversation && activeConversation.messages && activeConversation.messages.map((msg: any) => (
                 <CopilotMessageView key={msg.message_id} msg={msg} onAsk={handleSendCopilotMessage} />
               ))}
-              {copilotLoading && <p className="text-xs text-slate-400 italic">Searching the record and asking the local model...</p>}
+              {liveThinking && <CopilotThinking steps={liveThinking.steps} running startedAt={liveThinking.startedAt} />}
             </div>
             <form
               onSubmit={(e) => {
@@ -1146,9 +1149,10 @@ export default function ClinicalBriefApp() {
   useEffect(() => {
     if (token) {
       loadPatients();
-      loadGovernanceStats();
+      // Governance stats are admin/auditor only (N-37: everyone else got a 403 on every sign-in).
+      if (userRole === "admin" || userRole === "auditor") loadGovernanceStats();
     }
-  }, [token]);
+  }, [token, userRole]);
 
   // Page-specific lists load when their page opens (fresh on every visit).
   useEffect(() => {
@@ -1380,29 +1384,63 @@ export default function ClinicalBriefApp() {
     setActiveConversation({ ...activeConversation, messages: updatedMsgs });
     setConversations(prev => prev.map(c => c.conversation_id === activeConversation.conversation_id ? { ...c, messages: updatedMsgs } : c));
     setCopilotInput("");
+    const url = `${BACKEND_URL}/api/v1/copilot/chat/${activeConversation.conversation_id}`;
+    const request: RequestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) };
+    const failed = (text = "The Copilot request failed, so no answer was produced.") => ({
+      message_id: `error-${Date.now()}`, conversation_id: activeConversation.conversation_id, sender: "assistant",
+      content: text, citations: "[]", confidence: null, timestamp: new Date().toISOString(),
+    });
+    const startedAt = Date.now();
+    setLiveThinking({ steps: [], startedAt });
+    // A step event replaces the earlier event with the same id (active -> done/dead), otherwise it is appended.
+    const upsert = (ev: ThinkingStep) => setLiveThinking(cur => cur && {
+      ...cur, steps: cur.steps.some(s => s.id === ev.id) ? cur.steps.map(s => (s.id === ev.id ? ev : s)) : [...cur.steps, ev],
+    });
+    let assistantMsg: any = null;
+    let gotEvents = false;
     try {
-      const res = await fetchWithAuth(`${BACKEND_URL}/api/v1/copilot/chat/${activeConversation.conversation_id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content })
-      });
-      const assistantMsg = res.ok ? await res.json() : {
-        message_id: `error-${Date.now()}`,
-        conversation_id: activeConversation.conversation_id,
-        sender: "assistant",
-        content: "The Copilot request failed, so no answer was produced.",
-        citations: "[]",
-        confidence: null,
-        timestamp: new Date().toISOString()
-      };
-      const finalConv = { ...activeConversation, messages: [...updatedMsgs, assistantMsg] };
-      setActiveConversation(finalConv);
-      setConversations(prev => prev.map(c => c.conversation_id === finalConv.conversation_id ? finalConv : c));
+      const res = await fetchWithAuth(`${url}/stream`, request);
+      if (!res.ok || !res.body) throw new Error(`stream unavailable (${res.status})`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          const ev = JSON.parse(line);
+          gotEvents = true;
+          if (ev.type === "step") upsert(ev);
+          else if (ev.type === "final") assistantMsg = ev.message;
+          else if (ev.type === "error") assistantMsg = failed(ev.detail);
+        }
+      }
+      if (!assistantMsg) throw new Error("stream ended before the answer");
     } catch (e) {
-      console.error("Failed to send copilot message", e);
-    } finally {
-      setCopilotLoading(false);
+      if (!gotEvents) {
+        // Streaming unavailable: ask the plain endpoint. No steps are shown then, only the real time taken.
+        try {
+          const res = await fetchWithAuth(url, request);
+          assistantMsg = res.ok ? { ...(await res.json()), answered_only: true, answered_ms: Date.now() - startedAt } : failed();
+        } catch (err) {
+          console.error("Failed to send copilot message", err);
+          assistantMsg = failed();
+        }
+      } else {
+        // The answer may still have been stored; asking again would duplicate the question.
+        assistantMsg = failed("The connection was lost before the answer arrived. Reopen this session to see it if it finished.");
+      }
     }
+    const finalConv = { ...activeConversation, messages: [...updatedMsgs, assistantMsg] };
+    setActiveConversation(finalConv);
+    setConversations(prev => prev.map(c => c.conversation_id === finalConv.conversation_id ? finalConv : c));
+    setLiveThinking(null);
+    setCopilotLoading(false);
   };
 
   // --- Handlers ---
@@ -2732,12 +2770,7 @@ export default function ClinicalBriefApp() {
                 <CopilotMessageView key={msg.message_id} msg={msg} />
               ))}
 
-              {copilotLoading && (
-                <div className="p-3 bg-blue-50/5 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-900 rounded-xl space-y-1">
-                  <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider animate-pulse">Copilot is thinking...</span>
-                  <div className="h-12 shimmer rounded"></div>
-                </div>
-              )}
+              {liveThinking && <CopilotThinking steps={liveThinking.steps} running startedAt={liveThinking.startedAt} />}
             </div>
 
             {/* Quick Prompts */}

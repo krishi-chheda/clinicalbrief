@@ -87,7 +87,7 @@ def test_cli_ask_is_audited_without_content(client, auth, monkeypatch):
     from app import cli
     from app.models.models import AuditLog
     pid, _ = new_patient(client, auth)
-    monkeypatch.setattr("app.services.grounded_copilot.grounded_answer", lambda db, p, q: {
+    monkeypatch.setattr("app.services.grounded_copilot.grounded_answer", lambda db, p, q, **kw: {
         "mode": "local-llm:fake", "grounding": "grounded", "evidence_count": 0, "search_terms": [],
         "answer": "SECRET ANSWER", "citations": [], "warnings": []})
     cli.main(["ask", pid, "SECRET QUESTION"])

@@ -1,180 +1,399 @@
-// Public 404 page for any unknown URL: "Patient not found". A flatlined ECG that can be revived into a looping
-// heartbeat, an ASCII "404" that scrambles in, a mock record-lookup log and a heart you can fling.
-// Motion only runs under prefers-reduced-motion: no-preference; otherwise everything is static and fully visible,
-// and the ECG button still swaps the line without animating. All content is in the markup, so nothing needs JS
-// to be visible. Nothing here is patient data; the monitor is decoration.
+// Public 404: "This page was discharged without a follow-up." A line-art hospital campus at night, simulated live:
+// three ambulances loop the ring road and stop at the ED bay, a medevac helicopter lifts off the roof, circles and
+// lands, ward windows light up and go dark. Drag to turn it. The counters (bottom right) are read from the same
+// simulation. Drawn on a canvas with a small hand-rolled projection (painter's sort, back-face culling), no 3D
+// library. Under prefers-reduced-motion the scene is a still frame (dragging still turns it).
+// Purely decorative: the canvas is aria-hidden; the page's text and link carry the meaning.
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { gsap } from "gsap";
-import { useGSAP } from "@gsap/react";
-import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
-import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
-import { MorphSVGPlugin } from "gsap/MorphSVGPlugin";
-import { SplitText } from "gsap/SplitText";
-import { Draggable } from "gsap/Draggable";
-import { InertiaPlugin } from "gsap/InertiaPlugin";
-import { Heart } from "lucide-react";
-import { PublicPage, Section, Mono } from "./kit";
 
-gsap.registerPlugin(useGSAP, ScrambleTextPlugin, DrawSVGPlugin, MorphSVGPlugin, SplitText, Draggable, InertiaPlugin);
+type V = [number, number, number];                    // world: x east, y up, z south
+type Item = { depth: number; draw: (c: CanvasRenderingContext2D) => void };
 
-const MOTION = "(prefers-reduced-motion: no-preference)";
-const reduced = () => typeof window !== "undefined" && !window.matchMedia(MOTION).matches;
+const THEMES = {
+  dark: { bg: "#111711", top: "#1A2219", sideA: "#151C14", sideB: "#0E140D", ground: "#131A12", road: "#0C110B",
+          line: "rgba(205,216,190,0.62)", dim: "rgba(205,216,190,0.16)", lit: "#EBE46A", text: "#E6ECDF", muted: "#7E8C72",
+          heli: "rgba(205,216,190,0.85)", shadow: "rgba(0,0,0,0.35)", btnBg: "#E6ECDF", btnFg: "#0E140D",
+          glass: "#22343A", tyre: "#070A07", body: "#C9D4BC" },
+  light: { bg: "#F3F6EE", top: "#FFFFFF", sideA: "#E8EDE1", sideB: "#D8E0CE", ground: "#EEF2E8", road: "#E1E7D8",
+           line: "rgba(24,40,14,0.78)", dim: "rgba(24,40,14,0.14)", lit: "#F0CF4F", text: "#18280E", muted: "#6B7A5C",
+           heli: "rgba(24,40,14,0.9)", shadow: "rgba(24,40,14,0.12)", btnBg: "#18280E", btnFg: "#F3F6EE",
+           glass: "#BFD3D6", tyre: "#26301F", body: "#FFFFFF" },
+};
+type Theme = typeof THEMES.dark;
 
-// figlet "ANSI Shadow" 404, drawn on a fixed-width cell grid like the footer wordmark (ft-ascii-grid).
-const ASCII_404 = [
-  "██╗  ██╗ ██████╗ ██╗  ██╗",
-  "██║  ██║██╔═████╗██║  ██║",
-  "███████║██║██╔██║███████║",
-  "╚════██║████╔╝██║╚════██║",
-  "     ██║╚██████╔╝     ██║",
-  "     ╚═╝ ╚═════╝      ╚═╝",
+const hash = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+// --- Simulation --------------------------------------------------------------------------------------------------
+// The ambulance route: out of the ED bay, round the ring road, back into the bay.
+const BAY: [number, number] = [-3, 6.4];
+const ROUTE: [number, number][] = [BAY, [-3, 9], [13, 9], [13, -9], [-13, -9], [-13, 9], [-3, 9], BAY];
+const SEGS = ROUTE.slice(1).map((p, i) => ({ a: ROUTE[i], b: p, len: Math.hypot(p[0] - ROUTE[i][0], p[1] - ROUTE[i][1]) }));
+const ROUTE_LEN = SEGS.reduce((s, x) => s + x.len, 0);
+const SPEED = 4.2, DWELL = 7, CYCLE = ROUTE_LEN / SPEED + DWELL, AMBULANCES = 3;
+
+function ambulance(t: number, k: number) {
+  const u = (((t + (k * CYCLE) / AMBULANCES) % CYCLE) + CYCLE) % CYCLE;
+  if (u < DWELL) return { x: BAY[0], z: BAY[1], ang: -Math.PI / 2, inBay: true, toArrive: 0 };
+  let d = (u - DWELL) * SPEED;
+  for (const s of SEGS) {
+    if (d <= s.len) {
+      const f = d / s.len;
+      return { x: lerp(s.a[0], s.b[0], f), z: lerp(s.a[1], s.b[1], f), ang: Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]),
+               inBay: false, toArrive: (ROUTE_LEN - (u - DWELL) * SPEED) / SPEED };
+    }
+    d -= s.len;
+  }
+  return { x: BAY[0], z: BAY[1], ang: -Math.PI / 2, inBay: true, toArrive: 0 };
+}
+
+// Medevac: on the pad, lift, fly out, circle the campus, come back, land. 34 s loop.
+const PAD: V = [-2, 6.05, 0];
+function helicopter(t: number) {
+  const u = ((t % 34) + 34) % 34, R = 7.5, H = PAD[1] + 2.4;
+  const orbit = (a: number): V => [Math.cos(a) * R, H, Math.sin(a) * R];
+  const a0 = -Math.PI / 2, start = orbit(a0);
+  let p: V, flying = true, heading = 0;
+  if (u < 9) { p = PAD; flying = false; }
+  else if (u < 12) { p = [PAD[0], lerp(PAD[1], H, smooth((u - 9) / 3)), PAD[2]]; }
+  else if (u < 15) { const f = smooth((u - 12) / 3); p = [lerp(PAD[0], start[0], f), H, lerp(PAD[2], start[2], f)]; heading = Math.atan2(start[2] - PAD[2], start[0] - PAD[0]); }
+  else if (u < 27) { const a = a0 + ((u - 15) / 12) * Math.PI * 2; p = orbit(a); heading = a + Math.PI / 2; }
+  else if (u < 30) { const f = smooth((u - 27) / 3); p = [lerp(start[0], PAD[0], f), H, lerp(start[2], PAD[2], f)]; heading = Math.atan2(PAD[2] - start[2], PAD[0] - start[0]); }
+  else { p = [PAD[0], lerp(H, PAD[1], smooth((u - 30) / 4)), PAD[2]]; }
+  const rotor = flying || u > 6 ? 1 : 0.15;                // spins up before take-off
+  return { p, heading, flying, rotor };
+}
+
+// Ward window lit state: each window keeps its own schedule (changes every 5-17 s).
+const lit = (id: number, t: number) => {
+  const period = 5 + hash(id) * 12, slot = Math.floor((t + hash(id + 9) * period) / period);
+  return hash(id * 31 + slot) > 0.55;
+};
+
+// --- Static campus -------------------------------------------------------------------------------------------------
+type Box = { x: number; z: number; w: number; d: number; h: number; y0?: number; win?: [number, number]; id: number; cross?: boolean };
+const BUILDINGS: Box[] = [
+  { id: 1, x: -6, z: -4, w: 8, d: 8, h: 6, win: [4, 6] },          // main tower (helipad on the roof)
+  { id: 2, x: 2, z: -3, w: 7.5, d: 5, h: 4.4, win: [3, 6] },       // ward wing
+  { id: 3, x: -8.5, z: 4, w: 7.5, d: 2.2, h: 2.2, win: [1, 6], cross: true },  // emergency department
+  { id: 4, x: -4.2, z: 6.2, w: 2.4, d: 1.4, h: 0.18, y0: 2.0 },                // ED canopy over the bay
+  { id: 5, x: -1, z: -7, w: 3, d: 2.6, h: 1.6, win: [1, 2] },       // plant room
 ];
-const COLS = ASCII_404[0].length;
-const SCRAMBLE = "░▒▓█╔╗╚╝═║";
-
-// Two P-QRS-T complexes across a 600x120 strip; the flat line has the same points at baseline, so the morph is
-// point-for-point.
-const BEAT_PTS: [number, number][] = [[0, 60], [70, 60], [85, 52], [100, 60], [120, 60], [130, 70], [145, 14], [160, 102], [172, 60], [200, 60], [225, 47], [250, 60], [300, 60]];
-const pts = (flat: boolean) => [...BEAT_PTS, ...BEAT_PTS.slice(1).map(([x, y]) => [x + 300, y] as [number, number])]
-  .map(([x, y], i) => `${i ? "L" : "M"}${x} ${flat ? 60 : y}`).join(" ");
-const FLAT = pts(true), BEAT = pts(false);
-const SWEEP = 2; // seconds per sweep: two beats, so 60 bpm on the display
-
-const LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/roadmap", label: "Roadmap" },
-  { href: "/login", label: "Sign in" },
-] as const;
+const CARS: Box[] = Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, x: 3.2 + (i % 5) * 1.6, z: 4 + Math.floor(i / 5) * 2.3, w: 0.9, d: 1.5, h: 0.55 }));
+const TREES = Array.from({ length: 16 }, (_, i) => {
+  const a = hash(i) * Math.PI * 2, r = 15.5 + hash(i + 50) * 3;
+  return { x: Math.cos(a) * r, z: Math.sin(a) * r * 0.75, s: 0.55 + hash(i + 90) * 0.4 };
+});
+const GRASS = Array.from({ length: 160 }, (_, i) => ({ x: (hash(i + 400) - 0.5) * 44, z: (hash(i + 700) - 0.5) * 34 }));
 
 export default function NotFoundPage() {
-  const root = useRef<HTMLDivElement>(null);
-  const loop = useRef<gsap.core.Timeline | null>(null);
-  const [path, setPath] = useState("");
-  const [alive, setAlive] = useState(false);
-  useEffect(() => { setPath(window.location.pathname); }, []);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [mode, setMode] = useState<"dark" | "light">("dark");
+  const [stats, setStats] = useState({ bay: 1, out: 2, next: 0, air: 0 });
+  const modeRef = useRef(mode); modeRef.current = mode;
 
-  const { contextSafe } = useGSAP(() => {
-    const mm = gsap.matchMedia();
-    mm.add(MOTION, () => {
-      const q = gsap.utils.selector(root);
-      const cells = (q(".nf-cell") as HTMLElement[]).filter(c => c.textContent !== " ");
+  useEffect(() => {
+    const cv = canvas.current!, ctx = cv.getContext("2d")!;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let W = 0, H = 0, dpr = 1, raf = 0, last = performance.now(), simT = 3, statsAt = 0;
+    let yaw = -0.62, vYaw = 0, drag: { x: number } | null = null, dirty = true;
+    const PITCH = 0.62, cp = Math.cos(PITCH), sp = Math.sin(PITCH);
 
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-      tl.from(q(".nf-monitor"), { y: 24, autoAlpha: 0, duration: 0.6 })
-        .from(q(".nf-flat"), { drawSVG: 0, duration: 1.1, ease: "power2.inOut" }, "-=0.2")
-        .add(scrambleIn(cells), 0)
-        .from(q(".nf-link"), { y: 12, autoAlpha: 0, stagger: 0.07, duration: 0.4 }, 0.9);
+    const resize = () => {
+      const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; dirty = true;
+    };
+    const ro = new ResizeObserver(resize); ro.observe(cv); resize();
 
-      // The heart can be flung around inside the monitor card and springs back home.
-      const heart = q(".nf-heart")[0];
-      const home = () => gsap.to(heart, { x: 0, y: 0, duration: 0.9, ease: "elastic.out(1, 0.45)" });
-      const [drag] = Draggable.create(heart, {
-        type: "x,y", bounds: q(".nf-monitor")[0], inertia: true, edgeResistance: 0.6,
-        onRelease() { if (!this.tween) home(); },
-        onThrowComplete: home,
+    const frame = () => {
+      const T: Theme = THEMES[modeRef.current];
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      // The campus fits the space under the text: about the lower 55% of the screen.
+      const S = Math.min(W / (W < 640 ? 33 : 46), (H * 0.55) / 22), CX = W / 2, CY = H * 0.67;
+      const rot = (x: number, z: number) => [x * cy - z * sy, x * sy + z * cy];
+      const P = ([x, y, z]: V) => { const [xr, zr] = rot(x, z); return { x: CX + xr * S, y: CY + (zr * sp - y * cp) * S, d: zr * cp + y * sp }; };
+      const facing = (nx: number, nz: number, ny = 0) => { const [, nzr] = rot(nx, nz); return nzr * cp + ny * sp > 0.001; };
+      const items: Item[] = [];
+      const poly = (pts: V[], fill: string | null, stroke: string | null, lw = 1) => (c: CanvasRenderingContext2D) => {
+        c.beginPath(); pts.forEach((v, i) => { const q = P(v); i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.closePath();
+        if (fill) { c.fillStyle = fill; c.fill(); }
+        if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw; c.lineJoin = "round"; c.stroke(); }
+      };
+      const avgDepth = (pts: V[]) => pts.reduce((s, v) => s + P(v).d, 0) / pts.length;
+
+      // An oriented box: footprint centred on (cx, cz), length along `ang`. Visible faces become depth-sorted items.
+      const obox = (cx: number, cz: number, len: number, wid: number, h: number, y0: number, ang: number,
+                    o: { win?: [number, number]; id?: number; cross?: boolean; tone?: number } = {}) => {
+        const ca = Math.cos(ang), sa = Math.sin(ang), hl = len / 2, hw = wid / 2, y1 = y0 + h;
+        const at = (u: number, v: number, y: number): V => [cx + u * ca - v * sa, y, cz + u * sa + v * ca];
+        const c = [at(-hl, -hw, 0), at(hl, -hw, 0), at(hl, hw, 0), at(-hl, hw, 0)];
+        const top: V[] = c.map(([x, , z]) => [x, y1, z] as V);
+        if (facing(0, 0, 1)) items.push({ depth: avgDepth(top) + 0.01, draw: poly(top, T.top, T.line) });
+        for (let i = 0; i < 4; i++) {
+          const a = c[i], b = c[(i + 1) % 4];
+          const nx = (b[2] - a[2]), nz = -(b[0] - a[0]);              // outward normal of this wall
+          if (!facing(nx, nz)) continue;
+          const face: V[] = [[a[0], y0, a[2]], [b[0], y0, b[2]], [b[0], y1, b[2]], [a[0], y1, a[2]]];
+          const [nxr] = rot(nx / Math.hypot(nx, nz), nz / Math.hypot(nx, nz));
+          const fill = nxr > 0 ? T.sideB : T.sideA;
+          items.push({
+            depth: avgDepth(face), draw: (g) => {
+              poly(face, fill, T.line)(g);
+              if (o.win) {                                       // window grid; some lit, each on its own schedule
+                const [rows, cols] = o.win, edge = Math.round(Math.hypot(b[0] - a[0], b[2] - a[2]) / Math.max(len, wid) * cols) || 1;
+                for (let r = 0; r < rows; r++) for (let k = 0; k < edge; k++) {
+                  const u0 = (k + 0.25) / edge, u1 = (k + 0.75) / edge, v0 = y0 + (r + 0.3) / rows * h, v1 = y0 + (r + 0.72) / rows * h;
+                  const pt = (u: number, y: number): V => [lerp(a[0], b[0], u), y, lerp(a[2], b[2], u)];
+                  const on = lit((o.id || 0) * 1000 + i * 100 + r * 10 + k, simT);
+                  poly([pt(u0, v0), pt(u1, v0), pt(u1, v1), pt(u0, v1)], on ? T.lit : null, T.dim, 0.8)(g);
+                }
+              }
+              if (o.cross && i === 2) {                          // red cross on the ED front wall
+                const m = (u: number, y: number): V => [lerp(a[0], b[0], u), y, lerp(a[2], b[2], u)];
+                const midU = 0.5, yC = y0 + h * 0.62, s = 0.32 / Math.hypot(b[0] - a[0], b[2] - a[2]);
+                g.strokeStyle = "#E5484D"; g.lineWidth = 3; g.lineCap = "round"; g.beginPath();
+                let q1 = P(m(midU - s, yC)), q2 = P(m(midU + s, yC)); g.moveTo(q1.x, q1.y); g.lineTo(q2.x, q2.y);
+                q1 = P(m(midU, yC - 0.32)); q2 = P(m(midU, yC + 0.32)); g.moveTo(q1.x, q1.y); g.lineTo(q2.x, q2.y); g.stroke();
+              }
+            },
+          });
+        }
+      };
+
+      // Ground layer (not sorted). There is no ground plate: the page background is the ground, so the scene has no
+      // edge. Grass ticks thin out with distance; the ring road, its dashed centre line and the car park lines.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = T.dim; ctx.lineWidth = 1;
+      for (const g of GRASS) {
+        const q = P([g.x, 0, g.z]);
+        ctx.globalAlpha = 1 - smooth((Math.hypot(g.x / 22, g.z / 17) - 0.45) / 0.55);
+        ctx.beginPath(); ctx.moveTo(q.x - 3, q.y); ctx.quadraticCurveTo(q.x, q.y - 2, q.x + 3, q.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      const ring = (o: number): V[] => [[-13 - o, 0, -9 - o], [13 + o, 0, -9 - o], [13 + o, 0, 9 + o], [-13 - o, 0, 9 + o]];
+      poly(ring(0.9), T.road, T.dim)(ctx); poly(ring(-0.9), T.bg, T.dim)(ctx);
+      poly([[-3.8, 0, 6.2], [-2.2, 0, 6.2], [-2.2, 0, 9], [-3.8, 0, 9]], T.road, T.dim)(ctx);       // spur to the bay
+      ctx.setLineDash([5, 7]); poly(ring(0), null, T.dim)(ctx); ctx.setLineDash([]);
+      for (let i = 0; i <= 5; i++) { const x = 2.4 + i * 1.6; poly([[x, 0, 3.6], [x, 0, 8.4]], null, T.dim)(ctx); }
+
+      // Campus.
+      for (const b of BUILDINGS) obox(b.x + b.w / 2, b.z + b.d / 2, b.w, b.d, b.h, b.y0 || 0, 0, { win: b.win, id: b.id, cross: b.cross });
+      for (const c of CARS) obox(c.x + c.w / 2, c.z + c.d / 2, c.w, c.d, c.h, 0, 0);
+      // Canopy posts.
+      for (const [x, z] of [[-4.1, 7.5], [-1.9, 7.5]] as [number, number][]) {
+        const pts: V[] = [[x, 0, z], [x, 2.0, z]]; items.push({ depth: avgDepth(pts), draw: poly(pts, null, T.line) });
+      }
+      // Helipad on the tower roof.
+      const padPts: V[] = Array.from({ length: 28 }, (_, i) => [PAD[0] + Math.cos(i / 28 * Math.PI * 2) * 2.1, PAD[1] - 0.04, PAD[2] + Math.sin(i / 28 * Math.PI * 2) * 2.1] as V);
+      items.push({
+        depth: avgDepth(padPts) + 0.02, draw: (g) => {
+          poly(padPts, null, T.line)(g);
+          const hp = (x: number, z: number): V => [PAD[0] + x, PAD[1] - 0.04, PAD[2] + z];
+          for (const seg of [[hp(-0.7, -0.9), hp(-0.7, 0.9)], [hp(0.7, -0.9), hp(0.7, 0.9)], [hp(-0.7, 0), hp(0.7, 0)]]) poly(seg, null, T.line, 1.6)(g);
+        },
       });
-      return () => drag.kill();
-    });
-  }, { scope: root });
+      // Trees: a trunk and a round crown, billboarded.
+      for (const tr of TREES) {
+        const base = P([tr.x, 0, tr.z]), top = P([tr.x, 1.6 * tr.s, tr.z]);
+        items.push({
+          depth: base.d, draw: (g) => {
+            g.strokeStyle = T.line; g.lineWidth = 1; g.beginPath(); g.moveTo(base.x, base.y); g.lineTo(top.x, top.y); g.stroke();
+            g.beginPath(); g.arc(top.x, top.y - 0.55 * S * tr.s, 0.75 * S * tr.s, 0, Math.PI * 2); g.fillStyle = T.top; g.fill(); g.stroke();
+          },
+        });
+      }
 
-  // "Typing" log: characters appear in order, like a terminal. Runs once the real pathname is known; the <p> is
-  // keyed by path so React replaces the node rather than patching text SplitText has already split.
-  useGSAP(() => {
-    if (!path) return;
-    gsap.matchMedia().add(MOTION, () => {
-      SplitText.create(root.current!.querySelector(".nf-log"), {
-        type: "chars", aria: "none",
-        onSplit: self => gsap.from(self.chars, { autoAlpha: 0, duration: 0.01, stagger: 0.02, delay: 0.3, ease: "none" }),
-      });
-    });
-  }, { scope: root, dependencies: [path] });
+      // --- Vehicles: solids built from faces in local coordinates (u forward, v right, y up). Each face is
+      // painter-sorted on its own and shaded by which way it points; `after` draws details onto a face.
+      type L = [number, number, number];
+      type F = { p: L[]; fill?: string; after?: (g: CanvasRenderingContext2D, at: (l: L) => V) => void };
+      const solid = (cx: number, cz: number, ang: number, y0: number, faces: F[]) => {
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const at = ([u, v, y]: L): V => [cx + u * ca - v * sa, y0 + y, cz + u * sa + v * ca];
+        for (const f of faces) {
+          const pts = f.p.map(at);
+          let nx = 0, ny = 0, nz = 0;                       // Newell normal (only its direction matters here)
+          for (let i = 0; i < pts.length; i++) {
+            const a = pts[i], b = pts[(i + 1) % pts.length];
+            nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]);
+          }
+          const n = Math.hypot(nx, ny, nz) || 1, [rx, rz] = rot(nx, nz);
+          const fill = f.fill ?? (Math.abs(ny) / n > 0.6 ? T.top : Math.abs(rx) > Math.abs(rz) ? T.sideB : T.sideA);
+          items.push({ depth: avgDepth(pts), draw: (g) => { poly(pts, fill, T.line)(g); f.after?.(g, at); } });
+        }
+        return at;
+      };
+      // A six-sided block from a bottom and a top quad (they may differ: tapers, slopes). Bottom is never seen.
+      const block = (b: L[], t: L[], side: (i: number) => Partial<F> = () => ({}), top: Partial<F> = {}): F[] => [
+        { p: t, ...top },
+        ...[0, 1, 2, 3].map(i => ({ p: [b[i], b[(i + 1) % 4], t[(i + 1) % 4], t[i]], ...side(i) })),
+      ];
+      const seg = (g: CanvasRenderingContext2D, a: V, b: V, color: string, w = 1.2) => {
+        const p1 = P(a), p2 = P(b); g.strokeStyle = color; g.lineWidth = w; g.lineCap = "round";
+        g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke();
+      };
+      const line = (a: V, b: V, color = T.line, w = 1.2, bias = 0) =>
+        items.push({ depth: (P(a).d + P(b).d) / 2 + bias, draw: (g) => seg(g, a, b, color, w) });
 
-  function scrambleIn(cells: HTMLElement[]) {
-    const tl = gsap.timeline();
-    cells.forEach((c, i) => {
-      const col = Array.prototype.indexOf.call(c.parentNode!.children, c) % COLS;
-      tl.to(c, { duration: 0.5 + Math.random() * 0.3, scrambleText: { text: c.dataset.ch!, chars: SCRAMBLE, speed: 0.6 } }, col * 0.025 + (i % 3) * 0.02);
-    });
-    return tl;
-  }
+      // Ambulances: box body with a red stripe and cross on both sides, a lower cab with a sloped windscreen,
+      // a light bar that flashes red/blue while driving, four wheels.
+      let bay = 0, out = 0, next = Infinity;
+      for (let k = 0; k < AMBULANCES; k++) {
+        const a = ambulance(simT, k);
+        if (a.inBay) bay++; else { out++; next = Math.min(next, a.toArrive); }
+        const flash = !a.inBay && Math.floor(simT * 5 + k) % 2 === 0;
+        const ca = Math.cos(a.ang), sa = Math.sin(a.ang);
+        const wheelAt = (u: number, v: number): V => [a.x + u * ca - v * sa, 0.17, a.z + u * sa + v * ca];
+        for (const [u, v] of [[-0.62, -0.41], [-0.62, 0.41], [0.6, -0.41], [0.6, 0.41]]) {
+          const c = wheelAt(u, v), q = P(c);
+          items.push({ depth: q.d - 0.2, draw: (g) => { g.fillStyle = T.tyre; g.strokeStyle = T.line; g.lineWidth = 1; g.beginPath(); g.ellipse(q.x, q.y, 0.2 * S, 0.15 * S, 0, 0, Math.PI * 2); g.fill(); g.stroke(); } });
+        }
+        const markings = (i: number): Partial<F> => (i === 0 || i === 2 ? {
+          fill: T.body,
+          after: (g, at) => {
+            const v = i === 0 ? -0.401 : 0.401;
+            seg(g, at([-0.92, v, 0.5]), at([0.28, v, 0.5]), "#E5484D", 2.2);              // stripe
+            seg(g, at([-0.38, v, 0.62]), at([-0.38, v, 0.88]), "#E5484D", 2.2);           // cross
+            seg(g, at([-0.51, v, 0.75]), at([-0.25, v, 0.75]), "#E5484D", 2.2);
+          },
+        } : { fill: T.body });
+        solid(a.x, a.z, a.ang, 0, [
+          ...block([[-0.95, -0.4, 0.17], [0.3, -0.4, 0.17], [0.3, 0.4, 0.17], [-0.95, 0.4, 0.17]],
+                   [[-0.95, -0.4, 0.98], [0.3, -0.4, 0.98], [0.3, 0.4, 0.98], [-0.95, 0.4, 0.98]], markings, { fill: T.body }),
+          ...block([[0.3, -0.38, 0.17], [0.92, -0.38, 0.17], [0.92, 0.38, 0.17], [0.3, 0.38, 0.17]],
+                   [[0.3, -0.36, 0.74], [0.62, -0.34, 0.68], [0.62, 0.34, 0.68], [0.3, 0.36, 0.74]],
+                   (i) => (i === 1 ? { fill: T.glass } : { fill: T.body }), { fill: T.body }),
+          ...block([[0.1, -0.3, 0.98], [0.27, -0.3, 0.98], [0.27, 0.3, 0.98], [0.1, 0.3, 0.98]],
+                   [[0.1, -0.3, 1.07], [0.27, -0.3, 1.07], [0.27, 0.3, 1.07], [0.1, 0.3, 1.07]],
+                   () => ({}), { fill: a.inBay ? T.top : flash ? "#E5484D" : "#4C8DF6" }),
+        ]);
+        if (!a.inBay) {
+          const bp = P([a.x + 0.18 * ca, 1.1, a.z + 0.18 * sa]);
+          items.push({ depth: bp.d + 0.5, draw: (g) => {
+            g.fillStyle = flash ? "#E5484D" : "#4C8DF6"; g.globalAlpha = 0.22;
+            g.beginPath(); g.arc(bp.x, bp.y, 0.3 * S, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+          } });
+        }
+      }
 
-  const rescramble = contextSafe(() => {
-    if (reduced() || !root.current) return;
-    const cells = Array.from(root.current.querySelectorAll<HTMLElement>(".nf-cell")).filter(c => c.dataset.ch !== " ");
-    gsap.killTweensOf(cells);
-    scrambleIn(cells);
-  });
+      // Medevac helicopter: cabin with a glazed tapered nose, tapering tail boom, fin and tail rotor, skids on
+      // struts, mast and a two-blade rotor (a faint disc when it spins fast). Shadow only when over open ground.
+      const hc = helicopter(simT), [hx, hy, hz] = hc.p;
+      const overBuilding = BUILDINGS.some(b => hx > b.x && hx < b.x + b.w && hz > b.z && hz < b.z + b.d);
+      if (!overBuilding) {
+        const sh = P([hx, 0, hz]);
+        items.push({ depth: -1e3, draw: (g) => { g.fillStyle = T.shadow; g.beginPath(); g.ellipse(sh.x, sh.y, 1.3 * S, 0.5 * S, 0, 0, Math.PI * 2); g.fill(); } });
+      }
+      const hAt = solid(hx, hz, hc.heading, hy, [
+        ...block([[-0.55, -0.3, 0.28], [0.35, -0.3, 0.28], [0.35, 0.3, 0.28], [-0.55, 0.3, 0.28]],
+                 [[-0.45, -0.25, 0.88], [0.18, -0.25, 0.88], [0.18, 0.25, 0.88], [-0.45, 0.25, 0.88]],
+                 (i) => ({ fill: T.body, after: i === 0 || i === 2 ? (g, at) => {
+                   const v = i === 0 ? -0.29 : 0.29;                      // side window + red cross
+                   poly([at([0.0, v, 0.5]), at([0.28, v, 0.5]), at([0.2, v, 0.76]), at([0.0, v, 0.76])], T.glass, T.line)(g);
+                   seg(g, at([-0.3, v, 0.45]), at([-0.3, v, 0.71]), "#E5484D", 2); seg(g, at([-0.43, v, 0.58]), at([-0.17, v, 0.58]), "#E5484D", 2);
+                 } : undefined }), { fill: T.body }),
+        ...block([[0.35, -0.3, 0.28], [0.86, -0.15, 0.3], [0.86, 0.15, 0.3], [0.35, 0.3, 0.28]],
+                 [[0.18, -0.25, 0.88], [0.64, -0.12, 0.6], [0.64, 0.12, 0.6], [0.18, 0.25, 0.88]],
+                 (i) => ({ fill: i === 3 ? T.body : T.glass }), { fill: T.glass }),
+        ...block([[-0.5, -0.1, 0.48], [-2.0, -0.04, 0.62], [-2.0, 0.04, 0.62], [-0.5, 0.1, 0.48]],
+                 [[-0.5, -0.1, 0.76], [-2.0, -0.04, 0.73], [-2.0, 0.04, 0.73], [-0.5, 0.1, 0.76]], () => ({ fill: T.body }), { fill: T.body }),
+        { p: [[-1.82, 0, 0.68], [-2.04, 0, 0.68], [-2.16, 0, 1.18], [-1.98, 0, 1.18]], fill: T.body },
+      ]);
+      const L3 = (u: number, v: number, y: number): V => hAt([u, v, y]);
+      for (const v of [-0.36, 0.36]) {                             // skids and struts
+        line(L3(-0.62, v, 0), L3(0.66, v, 0)); line(L3(0.66, v, 0), L3(0.78, v, 0.1));
+        line(L3(-0.3, v, 0), L3(-0.3, v * 0.8, 0.3)); line(L3(0.3, v, 0), L3(0.25, v * 0.8, 0.3));
+      }
+      line(L3(-0.12, 0, 0.88), L3(-0.12, 0, 1.04), T.line, 1.6, 0.2);   // mast
+      const spin = simT * (hc.rotor > 0.5 ? 24 : 2.5);
+      const fast = hc.rotor > 0.5;
+      const hub = L3(-0.12, 0, 1.04);
+      const blade = (a: number, r: number): V => [hub[0] + Math.cos(a) * r, hub[1], hub[2] + Math.sin(a) * r];
+      items.push({ depth: P(hub).d + 2, draw: (g) => {
+        if (fast) {                                                // motion blur disc
+          const disc = Array.from({ length: 32 }, (_, i) => blade((i / 32) * Math.PI * 2, 1.8));
+          g.globalAlpha = 0.12; poly(disc, T.heli, null)(g); g.globalAlpha = 0.35; poly(disc, null, T.heli)(g); g.globalAlpha = 1;
+        }
+        for (const off of [0, Math.PI]) seg(g, hub, blade(spin + off, 1.8), T.heli, fast ? 1 : 1.6);
+      } });
+      const tr = L3(-2.02, 0.07, 0.92);                              // tail rotor, spinning in its own plane
+      for (const off of [0, Math.PI]) {
+        const a = spin * 1.6 + off, e = L3(-2.02 + Math.cos(a) * 0.24, 0.07, 0.92 + Math.sin(a) * 0.24);
+        line(tr, e, T.heli, 1, 0.1);
+      }
 
-  const toggle = contextSafe(() => {
-    const q = gsap.utils.selector(root);
-    const next = !alive;
-    setAlive(next);
-    loop.current?.kill();
-    loop.current = null;
-    if (reduced()) { gsap.set(q(".nf-flat"), { attr: { d: next ? BEAT : FLAT } }); return; }
-    gsap.to(q(".nf-flat"), { morphSVG: next ? BEAT : FLAT, duration: next ? 0.7 : 0.9, ease: next ? "elastic.out(1, 0.5)" : "power2.inOut" });
-    if (!next) { gsap.to(q(".nf-trace"), { autoAlpha: 0, duration: 0.3 }); return; }
-    // Monitor sweep: a bright segment runs along the trace; the heart thumps on each R wave (x = 145 and 445).
-    const tl = gsap.timeline({ repeat: -1, delay: 0.4, defaults: { ease: "none" } });
-    tl.set(q(".nf-trace"), { autoAlpha: 1 })
-      .fromTo(q(".nf-trace"), { drawSVG: "0% 0%" }, { drawSVG: "0% 14%", duration: SWEEP * 0.14 })
-      .to(q(".nf-trace"), { drawSVG: "86% 100%", duration: SWEEP * 0.72 })
-      .to(q(".nf-trace"), { drawSVG: "100% 100%", duration: SWEEP * 0.14 });
-    [145, 445].forEach(x => tl.fromTo(q(".nf-heart-icon"), { scale: 1 }, { scale: 1.3, duration: 0.09, yoyo: true, repeat: 1, ease: "power2.out" }, (x / 600) * SWEEP));
-    loop.current = tl;
-  });
+      items.sort((p, q) => p.depth - q.depth);
+      for (const it of items) it.draw(ctx);
+      // Fade the far ground into the page (an ellipse matching the ground's perspective).
+      ctx.save(); ctx.translate(CX, CY); ctx.scale(1, 0.62);
+      const fade = ctx.createRadialGradient(0, 0, 15.5 * S, 0, 0, 24 * S);
+      fade.addColorStop(0, T.bg + "00"); fade.addColorStop(1, T.bg);
+      ctx.fillStyle = fade; ctx.fillRect(-W, -H / 0.62, 2 * W, (2 * H) / 0.62); ctx.restore();
+      return { bay, out, next: Number.isFinite(next) ? Math.ceil(next) : 0, air: hc.flying ? 1 : 0 };
+    };
 
+    const loop = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (!reduce) simT += dt;
+      if (!drag) { yaw += vYaw; vYaw *= 0.93; }
+      if (!reduce || dirty || Math.abs(vYaw) > 1e-4 || drag) {
+        const s = frame(); dirty = false;
+        if (now - statsAt > 250) { statsAt = now; setStats(prev => (prev.bay === s.bay && prev.out === s.out && prev.next === s.next && prev.air === s.air ? prev : s)); }
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    const down = (e: PointerEvent) => { cv.setPointerCapture(e.pointerId); drag = { x: e.clientX }; vYaw = 0; };
+    const move = (e: PointerEvent) => { if (!drag) return; const dx = e.clientX - drag.x; drag.x = e.clientX; vYaw = dx * 0.008; yaw += vYaw; dirty = true; };
+    const up = () => { drag = null; };
+    cv.addEventListener("pointerdown", down); cv.addEventListener("pointermove", move);
+    cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+    const redraw = () => { dirty = true; };
+    window.addEventListener("cb-404-theme", redraw);
+    return () => {
+      cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener("cb-404-theme", redraw);
+      cv.removeEventListener("pointerdown", down); cv.removeEventListener("pointermove", move);
+      cv.removeEventListener("pointerup", up); cv.removeEventListener("pointercancel", up);
+    };
+  }, []);
+
+  useEffect(() => { window.dispatchEvent(new Event("cb-404-theme")); }, [mode]);
+
+  const T = THEMES[mode];
+  const mono = "font-mono uppercase tracking-[0.14em]";
   return (
-    <PublicPage eyebrow="Error 404" title="Patient not found."
-      intro={<p>No record matches this URL. It may have moved, or the link may be mistyped. The vitals below are only a joke.</p>}>
-      <div ref={root}>
-        <Section>
-          <div className="grid gap-8 lg:grid-cols-[auto_1fr] lg:items-center">
-            <div className="ft-ascii-grid text-[#3F7308] select-none cursor-default w-max"
-              style={{ gridTemplateColumns: `repeat(${COLS}, 0.6em)`, fontSize: "min(30px, calc((100vw - 48px) / 16))" }}
-              aria-hidden="true" onMouseEnter={rescramble} onClick={rescramble}>
-              {ASCII_404.flatMap((r, y) => Array.from(r, (ch, x) => <span key={`${y}-${x}`} className="nf-cell" data-ch={ch}>{ch}</span>))}
-            </div>
+    <main className="relative min-h-[100svh] w-full overflow-hidden select-none" style={{ background: T.bg, color: T.text }}>
+      <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing touch-none" />
 
-            <div className="nf-monitor relative min-w-0 rounded-2xl bg-[#18280E] text-white p-5 md:p-7 overflow-hidden">
-              <div className="flex items-center justify-between gap-3">
-                <Mono className="text-[#B3C5A0]">Monitor · bed /404</Mono>
-                <span className="nf-heart relative z-10 touch-none cursor-grab active:cursor-grabbing p-1 -m-1" aria-hidden="true">
-                  <Heart className={`nf-heart-icon h-6 w-6 ${alive ? "fill-[#B2EB76] text-[#B2EB76]" : "text-[#4A5B38]"}`} />
-                </span>
-              </div>
-              <button type="button" onClick={toggle} aria-pressed={alive}
-                aria-label={alive ? "Flatline the heartbeat" : "Revive the heartbeat"}
-                className="mt-4 block w-full rounded-lg bg-[#090F05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B2EB76]"
-                style={{ backgroundImage: "linear-gradient(rgba(178,235,118,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(178,235,118,.07) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
-                <svg viewBox="0 0 600 120" className="w-full h-auto block" aria-hidden="true">
-                  <path className="nf-flat" d={FLAT} fill="none" stroke="#B3C5A0" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                  <path className="nf-trace" d={BEAT} fill="none" stroke="#B2EB76" strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" style={{ opacity: 0, visibility: "hidden" }} />
-                </svg>
-              </button>
-              <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="lp-mono text-sm" aria-live="polite">
-                  {alive ? <>HR <span className="text-[#B2EB76]">60</span> bpm · pulse restored, page still missing</> : <>HR <span className="text-[#B2EB76]">--</span> · no pulse on this URL</>}
-                </span>
-                <Mono className="text-[#B3C5A0]">{alive ? "tap to flatline" : "tap the line to revive"}</Mono>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-xl border border-[#B3C5A0]/70 bg-[#F4FAED] px-4 py-3 lp-mono text-[13px] leading-relaxed text-[#18280E] break-all">
-            <p key={path} className="nf-log"><span className="text-[#3F7308]">&gt;</span> GET {path || "/"} ... <span className="text-[#3F7308]">404</span> · no record matches this URL</p>
-          </div>
-
-          <ul className="mt-8 flex flex-wrap gap-3">
-            {LINKS.map(l => (
-              <li key={l.href} className="nf-link">
-                <Link href={l.href} className="lp-mono inline-block text-[13px] px-4 py-2.5 rounded-md bg-[#18280E] text-white hover:bg-[#090F05] transition-colors">{l.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-5 pt-4 text-[12px]" style={{ color: T.muted }}>
+        <button type="button" onClick={() => setMode(m => (m === "dark" ? "light" : "dark"))}
+          className="pointer-events-auto font-mono tracking-[0.06em] hover:underline underline-offset-4">
+          {mode === "dark" ? "Dark" : "Light"}
+        </button>
+        <span className={mono}>St. 404 General</span>
       </div>
-    </PublicPage>
+
+      <div className="pointer-events-none relative z-10 flex flex-col items-center px-6 pt-[9vh] text-center">
+        <h1 className="font-mono font-medium leading-none tracking-[0.04em] text-[clamp(64px,13vw,128px)]">404</h1>
+        <p className="mt-5 font-mono text-[clamp(14px,2.2vw,20px)] tracking-[0.03em]" style={{ color: T.muted }}>
+          This page was discharged without a follow-up.
+        </p>
+        <Link href="/" className={`pointer-events-auto mt-7 px-6 py-3 text-[13px] font-semibold ${mono} transition-transform hover:-translate-y-0.5 motion-reduce:transition-none`}
+          style={{ background: T.btnBg, color: T.btnFg }}>
+          Back to reception
+        </Link>
+      </div>
+
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-start gap-1 px-5 pb-4 text-[12px] sm:flex-row sm:items-center sm:justify-between sm:gap-4 ${mono}`} style={{ color: T.muted }}>
+        <span>Drag to turn</span>
+        <span className="normal-case tracking-[0.06em] tabular-nums" aria-live="off">
+          in bay {stats.bay} · en route {stats.out} · next arrival {stats.next}s<span className="hidden sm:inline"> · air {stats.air}</span>
+        </span>
+      </div>
+    </main>
   );
 }

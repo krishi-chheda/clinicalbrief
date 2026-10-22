@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_accessible_patient, accessible_patient_ids, audit_read
+from app.api.v1.deps import get_current_user, get_accessible_patient, accessible_patient_ids, audit_read, rate_limited
 from app.models.models import User, Document
 from app.schemas.schemas import SearchRequest, SearchResponse, QARequest, QAResponse
 from app.services.faiss_manager import vector_search_manager
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/search", tags=["Semantic Search & QA"])
 def semantic_query(
     payload: SearchRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(rate_limited("search"))
 ):
     """Executes a similarity search over clinical narrative vector chunks."""
     # Query text may contain PHI, so it is not logged.
@@ -37,7 +37,7 @@ def semantic_query(
 def document_qa(
     payload: QARequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(rate_limited("search"))
 ):
     """Contextual QA that answers queries about a single document."""
     # Validate document exists
@@ -67,7 +67,7 @@ class RecordSearchRequest(BaseModel):
 def search_patient_records(
     payload: RecordSearchRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(rate_limited("search"))
 ):
     """Phase 8a: search every note and the structured record across the patients you may access.
 

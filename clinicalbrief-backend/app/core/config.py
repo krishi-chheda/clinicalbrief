@@ -32,6 +32,11 @@ class Settings:
     LLM_MODEL: str = os.getenv("LLM_MODEL", "qwen3.5")  # chosen over llama3.1: see README comparison
     LLM_TIMEOUT_SECONDS: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
 
+    # S-4: interactive API docs (/docs, /redoc, /openapi.json) are off unless switched on (local development).
+    EXPOSE_API_DOCS: bool = os.getenv("EXPOSE_API_DOCS", "false").lower() == "true"
+    # S-2: per-user request limits on the expensive routes. "off" only for the test suite (see tests/conftest.py).
+    RATE_LIMITS: bool = os.getenv("RATE_LIMITS", "on").lower() != "off"
+
     # AI Engine Configuration
     USE_MOCK_MODELS: bool = os.getenv("USE_MOCK_MODELS", "true").lower() == "true"
 

@@ -26,10 +26,11 @@ class TokenResponse(BaseSchema):
 
 # --- Patient Schemas ---
 class PatientBase(BaseSchema):
-    first_name: str
-    last_name: str
+    # Limits match the columns (VARCHAR(100) / VARCHAR(20)): longer input is a 422, not a database error (S-3).
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
     date_of_birth: date
-    gender: str
+    gender: str = Field(min_length=1, max_length=20)
 
 class PatientCreate(PatientBase):
     pass
@@ -122,9 +123,9 @@ class DocumentInsightsResponse(BaseSchema):
 
 # --- Semantic Search & QA ---
 class SearchRequest(BaseSchema):
-    query: str
+    query: str = Field(min_length=1, max_length=500)
     patient_id: Optional[str] = None
-    k: Optional[int] = 5
+    k: Optional[int] = Field(default=5, ge=1, le=20)
 
 class SearchResultItem(BaseSchema):
     document_id: str
@@ -137,7 +138,7 @@ class SearchResponse(BaseSchema):
 
 class QARequest(BaseSchema):
     document_id: str
-    question: str
+    question: str = Field(min_length=1, max_length=2000)
 
 class QAResponse(BaseSchema):
     answer: str

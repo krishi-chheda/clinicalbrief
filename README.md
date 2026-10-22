@@ -1,6 +1,6 @@
 # ClinicalBrief
 
-**Live demo: [clinicalbrief.vercel.app](https://clinicalbrief.vercel.app)** · API: [clinicalbrief.onrender.com](https://clinicalbrief.onrender.com) ([docs](https://clinicalbrief.onrender.com/docs)) · [How it is deployed](DEPLOY.md)
+**Live demo: [clinicalbrief.vercel.app](https://clinicalbrief.vercel.app)** · API: [clinicalbrief.onrender.com](https://clinicalbrief.onrender.com) · [How it is deployed](DEPLOY.md)
 
 A clinical intelligence platform prototype: it ingests clinical records, structures them into one
 canonical model with provenance, runs an AI pipeline over clinical notes, and keeps humans in control
@@ -43,7 +43,7 @@ of every AI output.
 ## Architecture
 
 ```
-Next.js 15 (clinicalbrief-frontend)  --Bearer token-->  FastAPI (clinicalbrief-backend)  -->  Postgres (Supabase) / SQLite (dev)
+Next.js 16 (clinicalbrief-frontend)  --Bearer token-->  FastAPI (clinicalbrief-backend)  -->  Postgres (Supabase) / SQLite (dev)
       |  Supabase Auth (supabase-js session, auto-refresh)       |
       |                                                          +-- app/ingestion   source adapters -> canonical model
       |                                                          +-- app/services    AI pipeline, search, FHIR, risk
@@ -220,6 +220,18 @@ FHIR export is limited to admin, clinician, consultant and coder.
 - Reads of clinical data are audited: viewing a patient's record (`view_record`), note text (`view_note_text`), note AI output and its evidence sentences (`view_note_insights`) and Copilot questions (`copilot_query`, `copilot_query_cli`) log who and which id, never the content. The audit log is served in pages (`limit` ≤ 500, `X-Total-Count`).
 - Uploads: UTF-8 `.txt` only, max 5 MB, stored under a server-generated name (the client filename is display-only).
 - Storage buckets are private. CORS is restricted to configured origins.
+- Hardening (security audit, 2026-10-19):
+  - **Headers.** Every API response sends `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS
+    and a `default-src 'none'` CSP. The site sends a CSP (scripts, styles, connections and frames limited to itself,
+    the API, Supabase and Turnstile), `frame-ancestors 'none'`, nosniff, a referrer policy and a permissions policy,
+    and no `X-Powered-By`.
+  - **Rate limits per user** (in-process; `RATE_LIMITS` in `deps.py`): Copilot 20/min, search 60/min, uploads 30/min,
+    answered with 429 and `Retry-After`. A Copilot stream holds a slot: one per user and 6 in total.
+  - **Input limits.** Patient names (100) and gender (20) match their columns; search text 500 and question text
+    2,000 characters.
+  - **Docs.** The interactive API docs (`/docs`, `/openapi.json`) are off unless `EXPOSE_API_DOCS=true`, which the
+    local launch config sets.
+  - **Tokens.** They must be issued by this project's Auth server (`iss`), as well as signed for it (`aud`).
 
 ## Public demo
 
@@ -291,9 +303,6 @@ Frontend: `npx tsc --noEmit`, `npm run build`, `npm audit --omit=dev`. No linter
   the content. A clinical deployment would need retention instead (soft delete, governance-only access).
 - The document comparison only reports what is mentioned in the earliest vs latest note ("only in earlier note"),
   from reviewed entities; absence from a note does not mean a condition resolved.
-- `next build` warns that supabase-js references a Node API in the Edge middleware (upstream library; the build and
-  middleware work).
-
 - The frontend is still one large component; views are URL-routed (`/patients/:id`, `/patients/:id/notes/:docId`).
 - A patient's note picker lists the newest 100 notes, newest first (`X-Total-Count` gives the full number, and a
   linked note is always included). Older notes are reachable through Search records.

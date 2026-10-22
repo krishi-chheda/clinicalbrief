@@ -11,7 +11,7 @@ import uuid
 import datetime
 
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_accessible_patient
+from app.api.v1.deps import get_current_user, get_accessible_patient, rate_limited, acquire_stream, release_stream
 from app.models.models import User, Patient, CopilotConversation, AuditLog
 from app.schemas.schemas import CopilotConversationResponse, CopilotMessageResponse, CopilotMessageCreate, CopilotConversationCreate
 from app.services.qa_engine import qa_engine
@@ -160,7 +160,7 @@ def send_copilot_message(
     conversation_id: str,
     payload: CopilotMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(rate_limited("copilot"))
 ):
     """Answers one question in a conversation (the whole answer at once; /stream reports the stages live)."""
     from app.services.grounded_copilot import StepTrace
@@ -173,7 +173,7 @@ def stream_copilot_message(
     conversation_id: str,
     payload: CopilotMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(rate_limited("copilot"))
 ):
     """F-01: the same answer as /chat, with each real pipeline stage streamed as it starts and finishes.
 
@@ -185,6 +185,7 @@ def stream_copilot_message(
     from app.services.grounded_copilot import StepTrace
     _own_conversation(db, conversation_id, current_user)
     user_id, content = current_user.id, payload.content
+    acquire_stream(user_id)  # 429 if this user already has an answer running, or the server is at its cap
     events: queue.Queue = queue.Queue()
 
     def work():
@@ -199,9 +200,14 @@ def stream_copilot_message(
             events.put({"type": "error", "detail": "The answer could not be completed. Please try again."})
         finally:
             s.close()
+            release_stream(user_id)
             events.put(None)
 
-    threading.Thread(target=work, daemon=True).start()
+    try:
+        threading.Thread(target=work, daemon=True).start()
+    except Exception:
+        release_stream(user_id)
+        raise
 
     def body():
         while (event := events.get()) is not None:

@@ -31,7 +31,7 @@ const PRINCIPLES = [
 ];
 
 const STACK = [
-  ["Frontend", "Next.js 15, React, TypeScript, Tailwind CSS, GSAP"],
+  ["Frontend", "Next.js 16, React, TypeScript, Tailwind CSS, GSAP"],
   ["Backend", "FastAPI, Python 3.12"],
   ["Database", "PostgreSQL on Supabase with row-level security; SQLite for local development"],
   ["Auth", "Supabase Auth, tokens verified by the backend"],

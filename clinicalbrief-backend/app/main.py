@@ -50,8 +50,23 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Backend pipeline for AI-powered Clinical Document Intelligence Platform",
-    lifespan=lifespan
+    lifespan=lifespan,
+    # S-4: no public API map in production; EXPOSE_API_DOCS=true turns the docs on (local development).
+    docs_url="/docs" if settings.EXPOSE_API_DOCS else None,
+    redoc_url="/redoc" if settings.EXPOSE_API_DOCS else None,
+    openapi_url="/openapi.json" if settings.EXPOSE_API_DOCS else None,
 )
+
+# S-1: browser security headers on every response. The API only returns JSON, so it may load nothing and be framed by
+# nothing; the interactive docs (when switched on) need their CDN assets, so they skip the CSP.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 # 3. Configure CORS Middleware for Next.js communication
 app.add_middleware(
@@ -76,6 +91,10 @@ async def request_telemetry(request: Request, call_next):
         response = await call_next(request)
         status = response.status_code
         response.headers["X-Request-ID"] = request_id
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        if not request.url.path.startswith(("/docs", "/redoc")):
+            response.headers.setdefault("Content-Security-Policy", API_CSP)
         return response
     finally:
         ms = (time.perf_counter() - t0) * 1000
@@ -98,5 +117,5 @@ def read_root():
         "ai_mode": "rule-based-prototype" if ai_orchestrator.use_mock else "transformers",
         # Which code is live: Render sets RENDER_GIT_COMMIT for each deploy; locally it is "local".
         "commit": os.environ.get("RENDER_GIT_COMMIT", "")[:7] or "local",
-        "docs_url": "/docs"
+        "docs_url": "/docs" if settings.EXPOSE_API_DOCS else None
     }

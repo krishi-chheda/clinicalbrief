@@ -27,6 +27,7 @@ os.environ["JWT_SECRET"] = "test-secret-at-least-32-bytes-long!!"
 os.environ["SUPABASE_URL"] = ""
 os.environ["UPLOAD_DIR"] = str(_tmp / "uploads")
 os.environ["USE_MOCK_MODELS"] = "true"
+os.environ["RATE_LIMITS"] = "off"  # the rate-limit tests switch them on themselves
 # Tests never call a real LLM: point the Copilot at a closed local port (tests that need a model use a fake).
 os.environ["LLM_BASE_URL"] = "http://127.0.0.1:9"
 

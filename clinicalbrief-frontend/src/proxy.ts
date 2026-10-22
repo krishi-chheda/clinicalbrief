@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+// Next 16 renamed middleware to proxy (same behaviour): refreshes the Supabase session cookie on each request.
+export async function proxy(request: NextRequest) {
   return await createClient(request);
 }
 

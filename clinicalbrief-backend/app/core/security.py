@@ -40,9 +40,11 @@ def decode_supabase_token(token: str) -> Optional[dict]:
             algorithms = ASYMMETRIC_ALGS
         else:
             return None
+        # S-6: with the project URL configured, the token must also be issued by THIS project's Auth server.
+        issuer = f"{settings.SUPABASE_URL}/auth/v1" if settings.SUPABASE_URL else None
         return jwt.decode(
-            token, key, algorithms=algorithms, audience=settings.JWT_AUDIENCE,
-            options={"require": ["exp", "sub"]}, leeway=CLOCK_SKEW_SECONDS,
+            token, key, algorithms=algorithms, audience=settings.JWT_AUDIENCE, issuer=issuer,
+            options={"require": ["exp", "sub"] + (["iss"] if issuer else [])}, leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.PyJWTError as e:
         # Log the reason (expired, bad audience, bad signature) but never the token itself.

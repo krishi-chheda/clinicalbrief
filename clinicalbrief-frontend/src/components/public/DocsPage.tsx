@@ -175,7 +175,7 @@ export default function DocsPage() {
                   </li>
                   <li className="rounded-2xl border border-[#B3C5A0]/60 p-5">
                     <Mono className="text-[#3F7308]">clinicalbrief-frontend</Mono>
-                    <p className="mt-2">Next.js 15 with Supabase Auth. It reads clinical data <strong>only through the API</strong>, sending the session token as a Bearer header.</p>
+                    <p className="mt-2">Next.js 16 with Supabase Auth. It reads clinical data <strong>only through the API</strong>, sending the session token as a Bearer header.</p>
                   </li>
                 </ul>
                 <p>Local development can use SQLite (<C>clinicalbrief_dev.db</C>), created from the ORM. It has no migration path: after model changes, delete it and re-import. For the architecture story, see <Link href="/about" className="underline underline-offset-4">About ClinicalBrief</Link>.</p>
@@ -220,7 +220,7 @@ py -3.12 -m pip install -r requirements-dev.txt
 py -3.12 -m app.cli import synthea ../data/raw/synthea-fhir
 py -3.12 -m uvicorn app.main:app --reload --no-access-log`}</Cmd>
                 <p><C>--no-access-log</C> is deliberate: uvicorn&apos;s access log prints full URLs, which contain patient ids. The app records route templates, timing and a request id per call instead (System health).</p>
-                <p>FastAPI&apos;s interactive API docs are enabled at <C>/docs</C> on the backend port (the root endpoint also reports <C>docs_url</C>). <C>requirements-ml.txt</C> adds the transformer stack (several GB) for <C>USE_MOCK_MODELS=false</C>; that mode exists but is untested.</p>
+                <p>FastAPI&apos;s interactive API docs are at <C>/docs</C> on the backend port when <C>EXPOSE_API_DOCS=true</C> (the local launch config sets it; it is off in production). The root endpoint reports <C>docs_url</C>. <C>requirements-ml.txt</C> adds the transformer stack (several GB) for <C>USE_MOCK_MODELS=false</C>; that mode exists but is untested.</p>
 
                 <h3 className="lp-display text-xl font-semibold pt-4">5. Frontend</h3>
                 <Cmd>{`cd clinicalbrief-frontend

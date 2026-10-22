@@ -11,7 +11,7 @@ import os
 from app.core.database import get_db
 from app.api.v1.deps import (
     get_current_user, get_current_admin, require_roles, get_accessible_patient, can_access_patient,
-    CLINICAL_WRITE_ROLES, REVIEW_ROLES, audit_read,
+    CLINICAL_WRITE_ROLES, REVIEW_ROLES, audit_read, rate_limited,
 )
 from app.models.models import (
     User, Patient, Document, Summary, Entity, ICD10Mapping,
@@ -144,7 +144,7 @@ def run_ingestion_pipeline(document_id: str, db_session_factory, report_progress
         db.close()
 
 
-@router.post("/upload", response_model=DocumentResponse)
+@router.post("/upload", response_model=DocumentResponse, dependencies=[Depends(rate_limited("upload"))])
 async def upload_document(
     background_tasks: BackgroundTasks,
     patient_id: str = Form(...),

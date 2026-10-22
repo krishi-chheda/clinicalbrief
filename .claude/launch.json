@@ -6,7 +6,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "set CLINICALBRIEF_ALLOW_REMOTE_DB=1&& py -3.12 -m uvicorn app.main:app --app-dir clinicalbrief-backend --port 8000 --no-access-log"
+        "set CLINICALBRIEF_ALLOW_REMOTE_DB=1&& set EXPOSE_API_DOCS=true&& py -3.12 -m uvicorn app.main:app --app-dir clinicalbrief-backend --port 8000 --no-access-log"
       ],
       "port": 8000
     },

@@ -79,6 +79,7 @@ import { DEFAULT_LAYOUTS, knownWidgets, WidgetConfig } from "../lib/layouts";
 import { Patient, Document, PatientRecord, ProcessingStatus, PIPELINE_STAGES, scoreLabel, shortCodeSystem, ICD10Mapping, Entity, Summary, ParsedMedication, ParsedAllergy, DocumentInsights, AuditLog, BACKEND_URL, fetchProfile } from "../lib/clinical";
 import { SortableWidgetProps, SortableWidget, ConfidenceBadge, MetricCard, InsightCard, GROUNDING_STYLE, CopilotMessageView } from "../components/ui";
 import CopilotThinking, { ThinkingStep } from "../components/CopilotThinking";
+import { RecordSummary, RecordTimeline } from "../components/PatientRecordView";
 
 // Search by (display or source) name or id; filter by source and whether the patient has notes.
 function filterPatients(patients: Patient[], query: string, source: string, withNotesOnly: boolean): Patient[] {
@@ -913,25 +914,9 @@ export default function ClinicalBriefApp() {
         );
 
       case "timeline":
-        return patientRecord && patientRecord.timeline.length > 0 ? (
-          <div className="max-h-[36rem] overflow-y-auto pr-1 scrollbar-thin select-text">
-            <ol className="relative border-l border-slate-200 dark:border-slate-800 ml-2 space-y-3">
-              {patientRecord.timeline.map((e, idx) => (
-                <li key={idx} className="ml-4">
-                  <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-white dark:border-slate-950 bg-blue-500"></span>
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <time className="text-xs text-slate-500">{formatDate(e.at)}</time>
-                    <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 capitalize">{e.kind}</span>
-                  </div>
-                  <p className="text-sm text-slate-800 dark:text-slate-200">{e.label}{e.detail ? <span className="text-slate-500"> - {e.detail}</span> : null}</p>
-                </li>
-              ))}
-            </ol>
-            <span className="text-xs text-slate-500 block mt-3">Most recent {patientRecord.timeline.length} dated events from {sourceLabel(patientRecord.source_system)}</span>
-          </div>
-        ) : (
-          <div className="text-xs text-slate-400 italic py-6 text-center">No dated clinical events recorded for this patient.</div>
-        );
+        return patientRecord
+          ? <RecordTimeline record={patientRecord} sourceLabel={sourceLabel(patientRecord.source_system)} />
+          : <div className="text-xs text-slate-400 italic py-6 text-center">Loading timeline...</div>;
 
       case "fhir_export":
         const passed = fhirMeta?.validation.startsWith("structural-r4: pass");
@@ -1955,75 +1940,9 @@ export default function ClinicalBriefApp() {
     </div>
   );
 
-  const renderPatientRecord = () => {
-    if (!patientRecord) {
-      return <div className="premium-card p-5 text-xs text-slate-400">Loading structured record...</div>;
-    }
-    const c = patientRecord.counts;
-    const recentLabs = patientRecord.observations.slice(0, 8);
-    return (
-      <div className="premium-card p-5 space-y-4 select-text">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Clinical record</h2>
-          <span className="text-xs text-slate-500">
-            {[`${formatCount(c.encounters)} encounters`, `${formatCount(c.diagnoses)} diagnoses`, `${formatCount(c.medications)} medications`,
-              `${formatCount(c.allergies)} allergies`, `${formatCount(c.procedures)} procedures`, `${formatCount(c.observations)} observations`].join(" \u00b7 ")}
-          </span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-          <div>
-            <h3 className="text-xs uppercase font-semibold tracking-wide text-slate-500 mb-2">Diagnoses</h3>
-            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {patientRecord.diagnoses.slice(0, 15).map((d, i) => (
-                <li key={i} className="text-slate-800 dark:text-slate-200">
-                  {d.display}
-                  <span className="block text-xs text-slate-500">{shortCodeSystem(d.code_system)} {d.code}{d.clinical_status ? ` · ${d.clinical_status}` : ""}</span>
-                </li>
-              ))}
-              {patientRecord.diagnoses.length === 0 && <li className="text-slate-400 italic">None recorded</li>}
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-xs uppercase font-semibold tracking-wide text-slate-500 mb-2">Medications</h3>
-            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {patientRecord.medications.slice(0, 15).map((m, i) => (
-                <li key={i} className="text-slate-800 dark:text-slate-200">
-                  {m.name}
-                  <span className="block text-xs text-slate-500">{[m.dose, m.route, m.frequency, m.status].filter(Boolean).join(" · ") || "no dosage recorded"}</span>
-                </li>
-              ))}
-              {patientRecord.medications.length === 0 && <li className="text-slate-400 italic">None recorded</li>}
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-xs uppercase font-semibold tracking-wide text-slate-500 mb-2">Allergies</h3>
-            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {patientRecord.allergies.map((a, i) => (
-                <li key={i} className="text-slate-800 dark:text-slate-200">
-                  {a.allergen}
-                  <span className="block text-xs text-slate-500">{[a.reaction, a.severity, a.criticality && `criticality ${a.criticality}`].filter(Boolean).join(" · ") || "no reaction recorded"}</span>
-                </li>
-              ))}
-              {patientRecord.allergies.length === 0 && <li className="text-slate-400 italic">None recorded in source data</li>}
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-xs uppercase font-semibold tracking-wide text-slate-500 mb-2">Recent Observations</h3>
-            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {recentLabs.map((o, i) => (
-                <li key={i} className="text-slate-800 dark:text-slate-200">
-                  {o.name}: <span className="font-mono">{o.value ?? "—"} {o.unit || ""}</span>
-                  {o.flag && <span className="ml-1 text-xs font-semibold uppercase text-red-700 dark:text-red-400">{o.flag}</span>}
-                  <span className="block text-xs text-slate-500">{formatDate(o.effective_at)}{o.reference_range ? ` · ref ${o.reference_range}` : ""}</span>
-                </li>
-              ))}
-              {recentLabs.length === 0 && <li className="text-slate-400 italic">None recorded</li>}
-            </ul>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const renderPatientRecord = () => (patientRecord
+    ? <RecordSummary record={patientRecord} />
+    : <div className="premium-card p-5 text-xs text-slate-400">Loading structured record...</div>);
 
   const renderPatientList = () => {
     const rows = filterPatients(patients, patientQuery, patientSource, patientsWithNotesOnly);

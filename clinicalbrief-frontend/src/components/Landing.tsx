@@ -210,7 +210,7 @@ export default function Landing({ onSignIn, onTryDemo }: { onSignIn: () => void;
   useGSAP(() => {
     const mm = gsap.matchMedia();
     mm.add("(prefers-reduced-motion: no-preference)", () => {
-      smoother.current = ScrollSmoother.create({ wrapper: wrapper.current!, content: content.current!, smooth: 1.1, effects: true, smoothTouch: 0.1 });
+      smoother.current = ScrollSmoother.create({ wrapper: wrapper.current!, content: content.current!, smooth: 0.5, effects: true, smoothTouch: 0.1 });  // 0.5 s catch-up: a little glide, still responsive
 
       // Section reveals: rise and fade in, batched so neighbours stagger (Premium: power3.out, 0.8 s, no overshoot).
       gsap.set(".lp-reveal", { autoAlpha: 0, y: 32 });

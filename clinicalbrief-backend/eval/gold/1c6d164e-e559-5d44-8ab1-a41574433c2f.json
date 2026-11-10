@@ -1,0 +1,13 @@
+{
+ "note_id": "1c6d164e-e559-5d44-8ab1-a41574433c2f",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "body mass index 40+ - severely obese",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

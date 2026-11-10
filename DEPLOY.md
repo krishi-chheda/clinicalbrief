@@ -102,6 +102,21 @@ $env:CLINICALBRIEF_ALLOW_REMOTE_DB = "1"; py -3.12 -m app.cli flag-demo --apply
    on without the site key in Vercel breaks "Try the demo" (Supabase refuses sign-ins without a token).
 6. **Clean-up** (weekly, SQL Editor): `delete from auth.users where is_anonymous and created_at < now() - interval '7 days';`
 
+## 7. Upgrading to v1.0.1
+
+1. **Supabase SQL Editor**, in order: paste and run `clinicalbrief-backend/migrations/0013_researcher_no_direct_reads.sql`,
+   then `0014_note_embeddings.sql`. Both are safe to re-run.
+2. **Push**; Render and Vercel redeploy. Check `https://clinicalbrief.onrender.com/` reports `"version": "1.0.1"`.
+3. **Content security policy** is now per request (nonce). After the deploy, open the site with the browser console
+   open: there should be no "Content Security Policy" errors. Before the change the live site's first byte took
+   0.34-0.67 s; re-measure with `curl -s -o /dev/null -w "%{time_starttransfer}
+" https://clinicalbrief.vercel.app/`.
+4. **Optional, match-meaning search on the live data** (~100 MB of the 500 MB free tier, ~10 min on this machine's
+   GPU). It needs the local model, so run it locally against the live database:
+   `ollama pull nomic-embed-text`, then in `clinicalbrief-backend`:
+   `set CLINICALBRIEF_ALLOW_REMOTE_DB=1&& py -3.12 -m app.cli embed-notes` (resumable; re-run to continue).
+   The hosted API still searches by words only (it cannot reach a local model) and says so.
+
 ## What is different online (and said so on the site)
 
 - **Copilot** gives its labelled rule-based answers: the hosted API cannot reach a local model, and the app only

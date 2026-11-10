@@ -1,0 +1,49 @@
+{
+ "note_id": "0c4b03fb-1849-5ab1-b42f-6451f4a9485a",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "acute viral pharyngitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute infective cystitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "cephalexin 500 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "{21 (ethinyl estradiol 0.03 mg / levonorgestrel 0.15 mg oral tablet) / 7 (inert ingredients 1 mg oral tablet) } pack [levora 0.15/30 28 day]",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "{28 (norethindrone 0.35 mg oral tablet) } pack [jolivette 28 day]",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "1 ml medroxyprogesterone acetate 150 mg/ml injection",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "intramuscular injection",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

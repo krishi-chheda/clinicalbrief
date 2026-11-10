@@ -1,0 +1,13 @@
+{
+ "note_id": "b97b6d99-9036-5a7f-a8df-cdd8bbf53b41",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "anemia",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

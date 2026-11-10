@@ -195,6 +195,16 @@ def test_rls_patient_visibility(as_user, world):
     assert as_user(None, "select patient_id from patients", role="anon") == []
 
 
+def test_rls_researcher_has_no_direct_rows(as_user, world):
+    """v1.0.1 P-9: researchers read only through the API, which removes direct identifiers. Straight through
+    PostgREST (publishable key + their own token) they must get nothing, not real names and note text."""
+    researcher = world["users"]["researcher"]
+    for table in ["patients", "documents", "clinical_notes", "diagnoses", "observations"]:
+        assert as_user(researcher, f"select * from {table}") == [], table
+    ids = {str(r[0]) for r in as_user(world["users"]["consultant"], "select patient_id from patients")}
+    assert {world["mine"], world["other"]} <= ids
+
+
 def test_rls_blocks_client_writes_and_escalation(as_user, world):
     from sqlalchemy.exc import ProgrammingError
     uid = world["users"]["clinician"]

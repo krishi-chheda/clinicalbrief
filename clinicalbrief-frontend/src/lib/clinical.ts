@@ -10,6 +10,8 @@ export interface Patient {
   source_system?: string | null;
   document_count?: number;        // from GET /patients
   last_encounter_at?: string | null;
+  birth_year?: number | null;     // researchers: date_of_birth is withheld, only the year is sent
+  deidentified?: boolean;         // researchers: the name is a pseudonym ("Patient 3F9A12BC")
 }
 
 export const SOURCE_LABELS: Record<string, string> = {
@@ -21,8 +23,8 @@ export const sourceLabel = (source?: string | null) => (source && SOURCE_LABELS[
 // Synthea appends digits to generated names ("Alexandra16") so they can never match a real person.
 // They are hidden for display only; the stored source name is unchanged.
 const cleanName = (name: string) => name.replace(/\d+/g, "").replace(/\s+/g, " ").trim();
-export const displayName = (p: Pick<Patient, "first_name" | "last_name" | "source_system">) =>
-  p.source_system === "synthea" ? `${cleanName(p.first_name)} ${cleanName(p.last_name)}` : `${p.first_name} ${p.last_name}`;
+export const displayName = (p: Pick<Patient, "first_name" | "last_name" | "source_system" | "deidentified">) =>
+  p.source_system === "synthea" && !p.deidentified ? `${cleanName(p.first_name)} ${cleanName(p.last_name)}` : `${p.first_name} ${p.last_name}`;
 
 // Age in whole years (at death if deceased). No birth date means no age - never guessed.
 export const ageYears = (p: Pick<Patient, "date_of_birth" | "deceased_date">): number | null => {
@@ -33,7 +35,9 @@ export const ageYears = (p: Pick<Patient, "date_of_birth" | "deceased_date">): n
   if (end.getMonth() < dob.getMonth() || (end.getMonth() === dob.getMonth() && end.getDate() < dob.getDate())) age--;
   return age;
 };
-export const ageLabel = (p: Pick<Patient, "date_of_birth" | "deceased_date">) => {
+export const ageLabel = (p: Pick<Patient, "date_of_birth" | "deceased_date" | "birth_year">) => {
+  // Researchers get the birth year only: the age is then within one year, and says so.
+  if (!p.date_of_birth && p.birth_year) return `about ${new Date().getFullYear() - p.birth_year} y`;
   const age = ageYears(p);
   if (age == null) return "Age unknown";
   return p.deceased_date ? `Deceased (aged ${age})` : `${age} y`;

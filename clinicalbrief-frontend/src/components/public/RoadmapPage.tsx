@@ -31,14 +31,16 @@ const PHASES: Phase[] = [
     text: "The patient record, notes and layouts that tie the pieces together in one place to work from." },
   { id: "8a", title: "Record search", status: "done",
     text: "Postgres full-text search over every note and the structured record, with patient, type and date filters. Keyword-based, not semantic, and scoped to the patients a user may access." },
-  { id: "8b", title: "Semantic search", status: "planned",
-    text: "Embedding-based search, kept only if it beats full-text search on a fixed set of questions." },
+  { id: "8b", title: "Semantic search", status: "done", prototype: true,
+    text: "A “match meaning” option ranks notes by local embeddings as well as words. Kept because it beat full-text search on a fixed question set decided in advance (nDCG@10 0.65 vs 0.29): keyword search misses everyday words such as “ear infection” when the note says “otitis media”. Needs the local model, so the hosted demo uses words only." },
+  { id: "8c", title: "Accuracy evaluation", status: "done", prototype: true,
+    text: "The note pipeline scored on 40 labelled synthetic notes: what it finds is almost always right (precision 0.96), but it finds little (recall 0.07), because its dictionary is small. Labels are AI-drafted and not yet reviewed by a person; details on the Data page." },
   { id: "9", title: "Observability", status: "done",
     text: "A System health page for admins and auditors: live checks of the database, local model and search index, plus request timing, error rates and request ids. Kept in memory per backend process, so history resets on restart." },
-  { id: "10", title: "Security hardening", status: "next",
-    text: "A focused pass over authentication, access rules and data handling to close remaining gaps." },
+  { id: "10", title: "Security hardening", status: "done",
+    text: "Browser security headers and a content security policy, per-user rate limits and streaming caps, token issuer checks, input length limits, API docs off in production, and researchers kept out of direct table reads." },
   { id: "11", title: "Demo", status: "planned",
-    text: "A guided way to see the product working end to end on synthetic data." },
+    text: "A read-only sandbox on ten synthetic patients. Built and tested, but switched off until sign-ups are protected by a CAPTCHA." },
   { id: "12", title: "Industry readiness", status: "planned",
     text: "Documentation a technical reviewer would expect: how it is built, how to run it, and what its limits are." },
   { id: "13", title: "Portfolio", status: "planned",
@@ -97,9 +99,7 @@ function useRoadmapMotion(root: React.RefObject<HTMLDivElement | null>) {
 }
 
 const NOT_BUILT = [
-  "Accuracy evaluation on a labelled set. No accuracy figure is shown anywhere until it is measured.",
-  "Semantic search (Phase 8b).",
-  "A de-identified research view.",
+  "An accuracy evaluation on real (not synthetic) clinical text, with person-reviewed labels.",
 ];
 
 export default function RoadmapPage() {

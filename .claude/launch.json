@@ -20,6 +20,15 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "frontend-prod",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set NEXT_PUBLIC_API_URL=http://localhost:8000&& npm --prefix clinicalbrief-frontend run start -- -p 3100"
+      ],
+      "port": 3100
     }
   ]
 }

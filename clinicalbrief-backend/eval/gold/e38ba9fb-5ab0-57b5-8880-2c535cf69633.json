@@ -1,0 +1,25 @@
+{
+ "note_id": "e38ba9fb-5ab0-57b5-8880-2c535cf69633",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "sneezing fits",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "nasal discharge",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "nasal congestion",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

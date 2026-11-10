@@ -1,0 +1,91 @@
+{
+ "note_id": "77fe4d82-383e-5018-83dc-5e3ec1f05f00",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "acute bronchitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "facial laceration",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "primary dental caries",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute viral pharyngitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "laceration - injury",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "gingivitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "laceration of foot",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acetaminophen 325 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acetaminophen 21.7 mg/ml / dextromethorphan hydrobromide 1 mg/ml / doxylamine succinate 0.417 mg/ml oral solution",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "naproxen sodium 220 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "sodium fluoride 0.0272 mg/mg oral gel",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "ibuprofen 200 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "suture open wound",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "wound care",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

@@ -79,7 +79,7 @@ const ROUTES: [string, string, string, string][] = [
   ["POST", "/documents/{id}/process", "Run the AI pipeline on a note", WRITE],
   ["GET", "/documents/{id}/status", "Pipeline progress", ANY],
   ["GET", "/documents/{id}/insights", "AI output and evidence sentences (audited read)", ANY],
-  ["GET", "/documents/{id}/redacted", "Note text with regex redaction; researchers get redacted text only", ANY],
+  ["GET", "/documents/{id}/redacted", "Note text with regex redaction; researchers get redacted text only, names removed", ANY],
   ["GET", "/documents/compare/{id}", "Earliest vs latest note, reviewed entities only", ANY],
   ["POST", "/documents/entities/{id}/review", "Approve, reject or edit one AI finding", REVIEW],
   ["GET", "/review/queue", "Cross-patient review queue", REVIEW],
@@ -109,7 +109,7 @@ const ROLES: [string, string, string][] = [
   ["consultant", "all", "create patients, upload notes, review AI output"],
   ["coder", "all", "review/edit AI output (codes)"],
   ["auditor", "all (read-only)", "nothing; can read audit log, governance and import history"],
-  ["researcher", "all (read-only)", "nothing (a de-identified view is planned)"],
+  ["researcher", "all (read-only), with direct identifiers removed", "nothing"],
   ["demo", "only patients flagged for the public demo (read-only)", "nothing; Copilot only, private sessions. Anonymous sign-in"],
 ];
 

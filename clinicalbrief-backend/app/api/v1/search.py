@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_accessible_patient, accessible_patient_ids, audit_read, rate_limited
+from app.api.v1.deps import (get_current_user, get_accessible_patient, accessible_patient_ids, audit_read, rate_limited,
+                             deid, deid_items, is_research_view)
 from app.models.models import User, Document
 from app.schemas.schemas import SearchRequest, SearchResponse, QARequest, QAResponse
 from app.services.faiss_manager import vector_search_manager
@@ -26,12 +27,12 @@ def semantic_query(
     k = max(1, min(payload.k or 5, 50))
     if payload.patient_id:
         get_accessible_patient(payload.patient_id, db, current_user)
-        return {"results": vector_search_manager.similarity_search(query=payload.query, patient_id=payload.patient_id, k=k)}
-
-    allowed = accessible_patient_ids(current_user, db)
-    if allowed is None:
-        return {"results": vector_search_manager.similarity_search(query=payload.query, k=k)}
-    return {"results": vector_search_manager.similarity_search(query=payload.query, patient_ids=allowed, k=k)}
+        results = vector_search_manager.similarity_search(query=payload.query, patient_id=payload.patient_id, k=k)
+    else:
+        allowed = accessible_patient_ids(current_user, db)
+        results = vector_search_manager.similarity_search(
+            query=payload.query, k=k, **({} if allowed is None else {"patient_ids": allowed}))
+    return {"results": deid_items(current_user, db, results)}
 
 @router.post("/qa", response_model=QAResponse)
 def document_qa(
@@ -44,12 +45,10 @@ def document_qa(
     doc = db.query(Document).filter(Document.document_id == payload.document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Target document not found")
-    get_accessible_patient(doc.patient_id, db, current_user)
+    patient = get_accessible_patient(doc.patient_id, db, current_user)
 
     logger.info(f"QA execution on document {payload.document_id}")
-    answer_result = qa_engine.answer_question(payload.document_id, payload.question)
-    
-    return answer_result
+    return deid(current_user, patient, qa_engine.answer_question(payload.document_id, payload.question))
 
 
 class RecordSearchRequest(BaseModel):
@@ -61,6 +60,7 @@ class RecordSearchRequest(BaseModel):
     sort: Literal["relevance", "date"] = "relevance"
     expand: bool = True            # ask the local LLM for related terms (drug names, synonyms)
     per_kind: int = Field(default=25, ge=1, le=50)
+    meaning: bool = False          # v1.0.1: also rank notes by meaning (local embeddings, migration 0014)
 
 
 @router.post("/records")
@@ -93,8 +93,14 @@ def search_patient_records(
     result = search_records(
         db, accessible_patient_ids(current_user, db), payload.query, extra, patient_id=payload.patient_id,
         kinds=set(payload.kinds or []), date_from=payload.date_from, date_to=payload.date_to,
-        include_notes=current_user.role != "researcher", per_kind=payload.per_kind, sort=payload.sort)
+        include_notes=current_user.role != "researcher", per_kind=payload.per_kind, sort=payload.sort,
+        meaning=payload.meaning)
     audit_read(db, current_user, "search_records",
                f"Scope: {payload.patient_id or 'all accessible patients'}; hits: {sum(result.counts.values())}")
-    return {"hits": result.hits, "counts": result.counts, "terms": result.terms, "expanded": result.expanded,
-            "note": expansion_note, "notes_included": current_user.role != "researcher"}
+    hits = deid_items(current_user, db, result.hits)
+    if is_research_view(current_user):
+        for h in hits:
+            h["first_name"], h["last_name"], h["deidentified"] = "Patient", h["patient_id"][:8].upper(), True
+    return {"hits": hits, "counts": result.counts, "terms": result.terms, "expanded": result.expanded,
+            "note": expansion_note, "notes_included": current_user.role != "researcher",
+            "meaning": result.meaning, "meaning_note": result.meaning_note}

@@ -1,0 +1,49 @@
+{
+ "note_id": "a907e642-b1ab-5381-9558-e68c348e1678",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "laceration of foot",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "viral sinusitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "laceration - injury",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "gingivitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "ibuprofen 200 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "abuse-deterrent 12 hr oxycodone hydrochloride 15 mg extended release oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "sodium fluoride 0.0272 mg/mg oral gel",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+{
+ "note_id": "fffe6d54-55e9-5ad5-a3ea-0894c2325fa3",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "self-care interventions",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

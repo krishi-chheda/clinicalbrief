@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 // Every path resolves here so deep links work; the app itself is mounted once in the root layout
 // and reads the view from the URL (see src/lib/routes.ts). This page only supplies the tab title.
@@ -15,6 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
   return { title: `${title} · ClinicalBrief` };
 }
 
-export default function Page() {
+// Rendered per request: the CSP nonce (src/proxy.ts) can only be applied to a dynamically rendered page.
+export default async function Page() {
+  await connection();
   return null;
 }

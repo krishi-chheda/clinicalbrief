@@ -85,3 +85,10 @@ def test_root_reports_the_deployed_commit(client, monkeypatch):
     assert client.get("/").json()["commit"] == "local"
     monkeypatch.setenv("RENDER_GIT_COMMIT", "1a88d5b0123456789abcdef")
     assert client.get("/").json()["commit"] == "1a88d5b"
+
+
+def test_backend_and_frontend_report_the_same_version(client):
+    import json
+    from pathlib import Path
+    pkg = json.loads((Path(__file__).parents[2] / "clinicalbrief-frontend" / "package.json").read_text(encoding="utf-8"))
+    assert client.get("/").json()["version"] == pkg["version"]

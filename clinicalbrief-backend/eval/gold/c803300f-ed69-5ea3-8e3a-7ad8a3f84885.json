@@ -1,0 +1,43 @@
+{
+ "note_id": "c803300f-ed69-5ea3-8e3a-7ad8a3f84885",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "acute viral pharyngitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "gingivitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute bronchitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "simvastatin 10 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acetaminophen 21.7 mg/ml / dextromethorphan hydrobromide 1 mg/ml / doxylamine succinate 0.417 mg/ml oral solution",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "respiratory therapy",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

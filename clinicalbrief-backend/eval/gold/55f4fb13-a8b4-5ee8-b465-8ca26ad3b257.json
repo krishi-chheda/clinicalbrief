@@ -1,0 +1,19 @@
+{
+ "note_id": "55f4fb13-a8b4-5ee8-b465-8ca26ad3b257",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "ferrous sulfate 325 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "vitamin b12 5 mg/ml injectable solution",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

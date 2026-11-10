@@ -21,8 +21,12 @@ const KIND_STYLE: Record<string, string> = {
 interface Hit {
   kind: string; date: string | null; patient_id: string; first_name: string; last_name: string;
   label: string; detail: string | null; snippet: string | null; document_id?: string; event?: string; source_system: string | null;
+  by_meaning?: boolean; deidentified?: boolean;
 }
-interface Response_ { hits: Hit[]; counts: Record<string, number>; terms: string[]; expanded: boolean; note: string | null; notes_included: boolean }
+interface Response_ {
+  hits: Hit[]; counts: Record<string, number>; terms: string[]; expanded: boolean; note: string | null; notes_included: boolean;
+  meaning?: boolean; meaning_note?: string | null;
+}
 
 // ts_headline marks matches with ⟦ ⟧; turn them into <mark> elements without ever injecting HTML.
 function Snippet({ text }: { text: string }) {
@@ -43,6 +47,7 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState<"relevance" | "date">("relevance");
   const [expand, setExpand] = useState(true);
+  const [meaning, setMeaning] = useState(false);
   const [result, setResult] = useState<Response_ | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +62,7 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: query.trim(), patient_id: patientId || null, kinds: kinds.length ? kinds : null,
-          date_from: dateFrom || null, date_to: dateTo || null, sort, expand,
+          date_from: dateFrom || null, date_to: dateTo || null, sort, expand, meaning,
         }),
       });
       if (!res.ok) throw new Error(res.status === 422 ? "Check the search fields (query up to 200 characters)." : `Search failed (HTTP ${res.status}).`);
@@ -126,6 +131,10 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
             <input type="checkbox" checked={expand} onChange={e => setExpand(e.target.checked)} />
             Include related terms (local model)
           </label>
+          <label className="flex items-center gap-2 pb-2 text-slate-700 dark:text-slate-300" title="Also finds notes that say the same thing in other words (local embeddings)">
+            <input type="checkbox" checked={meaning} onChange={e => setMeaning(e.target.checked)} />
+            Match meaning in notes (local model)
+          </label>
         </div>
         <fieldset className="flex flex-wrap gap-1.5">
           <legend className="sr-only">Record types</legend>
@@ -150,6 +159,8 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
               {result.expanded && <span> (related terms suggested by the local model)</span>}
             </p>
             {result.note && <p>{result.note}</p>}
+            {result.meaning && <p>Notes ranked by meaning as well as words: notes marked &ldquo;by meaning&rdquo; share no words with your search.</p>}
+            {result.meaning_note && <p>{result.meaning_note}</p>}
             {!result.notes_included && <p>Note text is not searchable for your role (notes are not de-identified).</p>}
           </div>
           {result.hits.length === 0 ? (
@@ -161,8 +172,9 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className={`px-2 py-0.5 rounded-md text-xs font-medium capitalize ${KIND_STYLE[h.kind]}`}>{h.kind}</span>
                     <span className="text-slate-500 tabular-nums">{formatDate(h.date)}</span>
+                    {h.by_meaning && <span className="px-2 py-0.5 rounded-md text-xs border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400">by meaning</span>}
                     <button onClick={() => onOpenPatient(h.patient_id)} className="font-semibold text-slate-900 dark:text-white hover:underline">
-                      {displayName({ first_name: h.first_name, last_name: h.last_name, source_system: h.source_system })}
+                      {displayName({ first_name: h.first_name, last_name: h.last_name, source_system: h.source_system, deidentified: h.deidentified })}
                     </button>
                   </div>
                   <p className="text-sm text-slate-800 dark:text-slate-200">

@@ -1,0 +1,49 @@
+{
+ "note_id": "e4b3ec21-415a-5182-9400-314c14a1a25e",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "acute viral pharyngitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "viral sinusitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "medication reconciliation",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment of health and social care needs",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment of substance use",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment using alcohol use disorders identification test - consumption",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "patient referral for dental care",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

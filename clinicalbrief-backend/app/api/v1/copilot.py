@@ -11,7 +11,8 @@ import uuid
 import datetime
 
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_accessible_patient, rate_limited, acquire_stream, release_stream
+from app.api.v1.deps import (get_current_user, get_accessible_patient, rate_limited, acquire_stream, release_stream,
+                             is_research_view, patient_out)
 from app.models.models import User, Patient, CopilotConversation, AuditLog
 from app.schemas.schemas import CopilotConversationResponse, CopilotMessageResponse, CopilotMessageCreate, CopilotConversationCreate
 from app.services.qa_engine import qa_engine
@@ -32,7 +33,8 @@ def get_conversations(
         CopilotConversation.patient_id == patient_id,
         CopilotConversation.user_id == current_user.id,
     ).order_by(CopilotConversation.created_at.desc()).all()
-    return conversations
+    clean = _cleaner(db, current_user, patient_id)
+    return [clean(CopilotConversationResponse.model_validate(c).model_dump()) for c in conversations]
 
 @router.post("/conversations/{patient_id}", response_model=CopilotConversationResponse, status_code=status.HTTP_201_CREATED)
 def create_conversation(
@@ -54,7 +56,9 @@ def create_conversation(
     db.commit()
     db.refresh(new_conv)
 
-    welcome_text = f"Welcome to the AI Clinical Copilot for patient {patient.first_name} {patient.last_name}. I answer from this patient's processed notes only, and say so when the records do not contain an answer."
+    shown = patient_out(current_user, {"patient_id": patient.patient_id, "first_name": patient.first_name,
+                                        "last_name": patient.last_name, "date_of_birth": patient.date_of_birth})
+    welcome_text = f"Welcome to the AI Clinical Copilot for patient {shown['first_name']} {shown['last_name']}. I answer from this patient's processed notes only, and say so when the records do not contain an answer."
     welcome_msg = {
         "message_id": str(uuid.uuid4()),
         "conversation_id": new_conv.conversation_id,
@@ -85,6 +89,16 @@ def delete_conversation(
     db.delete(conversation)
     db.commit()
 
+def _cleaner(db: Session, user: User, patient_id: str):
+    """v1.0.1 Part D: for researchers, a function that removes the patient's names and birth date from any JSON-like
+    value (answers, citations, the step trace, streamed events); for everyone else, the identity."""
+    if not is_research_view(user):
+        return lambda obj: obj
+    from app.services.clinical_privacy import identifiers, scrub
+    names = identifiers(db.get(Patient, patient_id))  # computed now: the stream worker runs after this session
+    return lambda obj: scrub(obj, names)
+
+
 def _find_own(db: Session, conversation_id: str, user: User) -> Optional[CopilotConversation]:
     try:
         uuid.UUID(conversation_id)  # Postgres rejects a malformed uuid with an error (500); it is simply not found
@@ -106,9 +120,9 @@ def _own_conversation(db: Session, conversation_id: str, user: User) -> CopilotC
     return conversation
 
 
-def _answer(db: Session, conversation: CopilotConversation, content: str, user_id: str, trace):
+def _answer(db: Session, conversation: CopilotConversation, content: str, user_id: str, trace, clean=lambda o: o):
     """Stores the question, answers it, audits it and stores the answer with its trace (shared by /chat and /stream).
-    Returns (assistant message dict, suggested questions)."""
+    `clean` (see _cleaner) is applied to the answer before it is stored. Returns (assistant message dict, suggested questions)."""
     from app.services.grounded_copilot import grounded_answer
     from app.services.llm import LLMUnavailable
 
@@ -145,6 +159,7 @@ def _answer(db: Session, conversation: CopilotConversation, content: str, user_i
         "mode": mode, "grounding": grounding, "warnings": warnings, "search_terms": search_terms,
         "steps": trace.steps, "total_ms": trace.total_ms(), "timestamp": now(),
     }
+    assistant_msg = clean(assistant_msg)
     conversation.messages = list(conversation.messages) + [assistant_msg]
     db.commit()
     return assistant_msg, suggested_questions
@@ -165,7 +180,8 @@ def send_copilot_message(
     """Answers one question in a conversation (the whole answer at once; /stream reports the stages live)."""
     from app.services.grounded_copilot import StepTrace
     conversation = _own_conversation(db, conversation_id, current_user)
-    return _response(*_answer(db, conversation, payload.content, current_user.id, StepTrace()))
+    clean = _cleaner(db, current_user, conversation.patient_id)
+    return _response(*_answer(db, conversation, payload.content, current_user.id, StepTrace(), clean))
 
 
 @router.post("/chat/{conversation_id}/stream")
@@ -183,7 +199,7 @@ def stream_copilot_message(
     """
     from app.core.database import SessionLocal
     from app.services.grounded_copilot import StepTrace
-    _own_conversation(db, conversation_id, current_user)
+    clean = _cleaner(db, current_user, _own_conversation(db, conversation_id, current_user).patient_id)
     user_id, content = current_user.id, payload.content
     acquire_stream(user_id)  # 429 if this user already has an answer running, or the server is at its cap
     events: queue.Queue = queue.Queue()
@@ -193,7 +209,7 @@ def stream_copilot_message(
         s = SessionLocal()
         try:
             conversation = s.get(CopilotConversation, conversation_id)
-            msg, suggested = _answer(s, conversation, content, user_id, StepTrace(events.put))
+            msg, suggested = _answer(s, conversation, content, user_id, StepTrace(lambda e: events.put(clean(e))), clean)
             events.put({"type": "final", "message": jsonable_encoder(_response(msg, suggested))})
         except Exception:
             logger.exception("Copilot stream failed")

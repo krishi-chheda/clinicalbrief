@@ -8,6 +8,10 @@
     py -3.12 -m app.cli set-role someone@example.com consultant
     py -3.12 -m app.cli ask <patient_id> "What medications is the patient on?"
     py -3.12 -m app.cli flag-demo [--count 10] [--apply]     # choose the public demo patients (dry run by default)
+    py -3.12 -m app.cli eval-sample                          # write eval/notes/*.txt for the labelled set (reads only)
+    py -3.12 -m app.cli eval-extraction                      # score the note pipeline against eval/gold
+    py -3.12 -m app.cli eval-search-db / eval-search         # keyword vs meaning search comparison (see eval/)
+    py -3.12 -m app.cli embed-notes [--limit 1000]           # local embeddings for "match meaning" search (writes)
 """
 import argparse
 import json
@@ -56,10 +60,16 @@ def print_run(db, run: ImportRun):
 DEMO_MIN_NOTES, DEMO_MAX_LABS = 2, 3000
 
 
+def demo_rank(stats: dict):
+    """Sort key: most reviewed AI findings first (they make the demo show something), then the smallest record
+    (notes + lab results), so the hosted API stays quick."""
+    return (-stats["reviewed"], stats["notes"] + stats["labs"])
+
+
 def pick_demo_patients(db, count: int):
     """The `count` Synthea patients best suited to the public demo: at least two analysed notes (so Compare works),
-    some conditions, medications and lab results, not oversized. Ranked by reviewed AI findings, then analysed
-    notes, then conditions + medications. Returns [(patient, stats)]."""
+    some conditions, medications and lab results, not oversized. Ranked by demo_rank (reviewed AI findings, then
+    smallest record). Returns [(patient, stats)]."""
     from sqlalchemy import func
     from app.models.models import Diagnosis, Entity, Medication, Observation, Patient
     from app.services.entities import REVIEWED_STATUSES
@@ -81,7 +91,7 @@ def pick_demo_patients(db, count: int):
         if (stats["notes"] >= DEMO_MIN_NOTES and stats["conditions"] and stats["medications"]
                 and 0 < stats["labs"] <= DEMO_MAX_LABS):
             picked.append((patient, stats))
-    picked.sort(key=lambda ps: (ps[1]["reviewed"], ps[1]["notes"], ps[1]["conditions"] + ps[1]["medications"]), reverse=True)
+    picked.sort(key=lambda ps: demo_rank(ps[1]))
     return picked[:count]
 
 
@@ -107,6 +117,129 @@ def flag_demo(db, count: int, apply: bool):
     print(f"Flagged {len(chosen)} demo patients; every other patient is now is_demo = false.")
 
 
+EVAL_DIR = Path(__file__).resolve().parents[1] / "eval"
+
+
+def eval_sample(db, count: int, seed: int, resample: bool):
+    """Read-only: chooses the notes once (eval/sample.json, committed), then writes their text to eval/notes."""
+    from app.models.models import ClinicalNote
+    from app.services.evaluation import pick_sample
+    sample = EVAL_DIR / "sample.json"
+    if resample or not sample.exists():
+        sample.parent.mkdir(parents=True, exist_ok=True)
+        sample.write_text(json.dumps({"seed": seed, "count": count, "note_ids": pick_sample(db, count, seed)}, indent=1),
+                          encoding="utf-8")
+    ids = json.loads(sample.read_text(encoding="utf-8"))["note_ids"]
+    (EVAL_DIR / "notes").mkdir(exist_ok=True)
+    found = {n.document_id: n.original_text for n in db.query(ClinicalNote).filter(ClinicalNote.document_id.in_(ids))}
+    for i in ids:
+        if i in found:
+            (EVAL_DIR / "notes" / f"{i}.txt").write_text(found[i], encoding="utf-8")
+    missing = [i for i in ids if i not in found]
+    print(f"{len(ids) - len(missing)} of {len(ids)} notes written to {EVAL_DIR / 'notes'}")
+    if missing:
+        sys.exit(f"{len(missing)} notes are not in this database (import the Synthea sample first), e.g. {missing[0]}")
+
+
+def eval_extraction():
+    from datetime import date
+    from app.services.evaluation import run_extraction_eval
+    r = run_extraction_eval(EVAL_DIR)
+    f = lambda v: "  -  " if v is None else f"{v:.2f}"
+    ci = lambda c: "" if c[0] is None else f" [{c[0]:.2f}-{c[1]:.2f}]"
+    print(f"{r['notes']} notes, {r['targets']} target mentions ({r['gold_mentions']} labelled); pipeline: {r['pipeline']}; "
+          f"labelled by: {', '.join(r['labelled_by'])}; reviewed by: {', '.join(r['reviewed_by'])}")
+    for mode in ("strict", "lenient"):
+        o = r[mode]["overall"]
+        print(f"\n{mode}: precision {f(o['precision'])}{ci(o['precision_ci95'])}  recall {f(o['recall'])}{ci(o['recall_ci95'])}"
+              f"  F1 {f(o['f1'])}{ci(o['f1_ci95'])}  (tp {o['tp']}, fp {o['fp']}, fn {o['fn']}; "
+              f"negation errors {r[mode]['negation_errors']}, family-history errors {r[mode]['subject_errors']})")
+        for t, v in r[mode]["by_type"].items():
+            print(f"  {t:11} P {f(v['precision'])}{ci(v['precision_ci95'])}  R {f(v['recall'])}{ci(v['recall_ci95'])}"
+                  f"  (tp {v['tp']}, fp {v['fp']}, fn {v['fn']})")
+    out = EVAL_DIR / "results" / f"extraction-{date.today().isoformat()}.json"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(r, indent=1), encoding="utf-8")
+    print(f"\nwritten {out}")
+
+
+def eval_search_db(source: Path):
+    """Builds a throwaway local Postgres (pgserver, eval/search/pg) with the real migrations and copies the Synthea
+    patients, documents and notes from a local SQLite import into it. Prints its URL. Never touches DATABASE_URL."""
+    import sqlite3
+    import pgserver, psycopg
+    tests = Path(__file__).resolve().parents[1] / "tests"
+    uri = pgserver.get_server(EVAL_DIR / "search" / "pg", cleanup_mode=None).get_uri()
+    src = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+    src.row_factory = sqlite3.Row
+    with psycopg.connect(uri, autocommit=True) as pg:
+        pg.execute("DROP SCHEMA IF EXISTS private, extensions CASCADE")  # rebuilt from scratch (the stub resets the rest)
+        pg.execute((tests / "supabase_stub.sql").read_text())
+        for m in sorted((tests.parent / "migrations").glob("*.sql")):
+            pg.execute(m.read_text())
+        queries = {
+            "patients": "SELECT * FROM patients WHERE source_system = 'synthea'",
+            "documents": "SELECT d.* FROM documents d JOIN patients p USING (patient_id) WHERE p.source_system = 'synthea'",
+            "clinical_notes": "SELECT n.* FROM clinical_notes n JOIN patients p USING (patient_id) WHERE p.source_system = 'synthea'",
+        }
+        for table, sql in queries.items():
+            cols = {r[0]: r[1] for r in pg.execute(
+                "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' "
+                "AND table_name = %s AND is_generated = 'NEVER'", (table,))}
+            rows = src.execute(sql).fetchall()
+            keep = [c for c in rows[0].keys() if c in cols]
+            nulls = {"encounter_id", "uploaded_by", "assigned_clinician_id"}  # rows those point to are not copied
+            fix = lambda c, v: None if c in nulls else (bool(v) if cols[c] == "boolean" and v is not None else v)
+            with pg.cursor() as cur:
+                cur.executemany(f"INSERT INTO {table} ({', '.join(keep)}) VALUES ({', '.join(['%s'] * len(keep))})",
+                                [[fix(c, r[c]) for c in keep] for r in rows])
+            print(f"  {table:15} {len(rows):>6}")
+    print(f"\nRun the comparison against it:\n  DATABASE_URL={uri} py -3.12 -m app.cli eval-search")
+
+
+def embed_notes(db, limit=None):
+    """Embeds, with the local model, every note that has no embedding yet (resumable: run it again to continue)."""
+    from sqlalchemy import text
+    from app.core.database import is_sqlite
+    from app.services.embeddings import EMBED_MODEL, embed, shorten, to_pg
+    if is_sqlite:
+        sys.exit("Note embeddings live in Postgres (migration 0014).")
+    sql = ("SELECT n.document_id, n.original_text FROM clinical_notes n "
+           "LEFT JOIN note_embeddings e ON e.document_id = n.document_id WHERE e.document_id IS NULL ORDER BY n.document_id")
+    todo = db.execute(text(sql + (f" LIMIT {int(limit)}" if limit else ""))).all()
+    print(f"{len(todo)} notes to embed with {EMBED_MODEL} (local)")
+    for i in range(0, len(todo), 64):
+        batch = todo[i:i + 64]
+        vecs = shorten(embed([t for _, t in batch], "search_document"))
+        db.execute(text("INSERT INTO note_embeddings (document_id, model, embedding) "
+                        "VALUES (:d, :m, CAST(:v AS extensions.vector)) ON CONFLICT (document_id) DO NOTHING"),
+                   [{"d": d, "m": EMBED_MODEL, "v": to_pg(v)} for (d, _), v in zip(batch, vecs)])
+        db.commit()  # per batch, so an interrupted run keeps its progress
+        print(f"  {min(i + 64, len(todo))}/{len(todo)}", end=chr(13))
+    print()
+
+
+def eval_search(db):
+    from datetime import date
+    from app.core.database import is_sqlite
+    from app.services.search_eval import run_search_eval
+    if is_sqlite:
+        sys.exit("The keyword baseline is Postgres full-text search: point DATABASE_URL at the eval-search-db database.")
+    r = run_search_eval(db, EVAL_DIR)
+    print(f"{r['notes']} notes, {r['scored']} of {r['questions']} questions scored (no relevant note: "
+          f"{', '.join(r['excluded_no_relevant']) or 'none'}), top {r['k']}, embeddings: {r['embed_model']} (local)\n")
+    print(f"{'method':9} {'nDCG@10':>8} {'P@10':>6} {'MRR':>6}")
+    for m, s in r["summary"].items():
+        print(f"{m:9} {s['ndcg']:8.3f} {s['p']:6.3f} {s['mrr']:6.3f}")
+    for m, d in r["vs_keyword"].items():
+        print(f"\n{m} - keyword: nDCG@10 {d['ndcg_diff']:+.3f}, 95% CI [{d['ci95'][0]:+.3f}, {d['ci95'][1]:+.3f}] -> {d['verdict']}")
+    print(f"\nOutcome: {r['outcome']}")
+    out = EVAL_DIR / "results" / f"search-{date.today().isoformat()}.json"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(r, indent=1), encoding="utf-8")
+    print(f"written {out}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="app.cli", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -121,8 +254,19 @@ def main(argv=None):
     p.add_argument("patient_id"); p.add_argument("question")
     p = sub.add_parser("flag-demo", help="choose the patients the public demo can see (dry run unless --apply)")
     p.add_argument("--count", type=int, default=10); p.add_argument("--apply", action="store_true")
+    p = sub.add_parser("eval-sample", help="write the labelled set's note texts to eval/notes (reads the database only)")
+    p.add_argument("--count", type=int, default=40); p.add_argument("--seed", type=int, default=101)
+    p.add_argument("--resample", action="store_true", help="choose new notes (replaces eval/sample.json)")
+    sub.add_parser("eval-extraction", help="score the note pipeline against eval/gold, write eval/results")
+    p = sub.add_parser("eval-search-db", help="local Postgres copy of the Synthea notes for eval-search")
+    p.add_argument("--from", dest="source", type=Path, default=Path(__file__).resolve().parents[1] / "clinicalbrief_dev.db")
+    sub.add_parser("eval-search", help="keyword vs semantic vs hybrid note search on eval/search/questions.jsonl")
+    p = sub.add_parser("embed-notes", help="store local embeddings for notes that have none (migration 0014)")
+    p.add_argument("--limit", type=int, help="at most this many notes")
     args = parser.parse_args(argv)
-    if (args.cmd in ("import", "process-notes", "set-role", "ask") and not getattr(args, "dry_run", False)) or             (args.cmd == "flag-demo" and args.apply):
+    if args.cmd == "eval-search-db":
+        return eval_search_db(args.source)  # works on its own throwaway database, not DATABASE_URL
+    if (args.cmd in ("import", "process-notes", "set-role", "ask", "embed-notes") and not getattr(args, "dry_run", False)) or             (args.cmd == "flag-demo" and args.apply):
         from app.core.database import db_host, is_remote  # is_sqlite is the module-level import
         target = "local SQLite" if is_sqlite else f"{'REMOTE' if is_remote else 'local'} Postgres at {db_host}"
         print(f"Target database: {target}", file=sys.stderr)
@@ -176,6 +320,14 @@ def main(argv=None):
                 print(f"  ! {w}")
         elif args.cmd == "flag-demo":
             flag_demo(db, args.count, args.apply)
+        elif args.cmd == "eval-sample":
+            eval_sample(db, args.count, args.seed, args.resample)
+        elif args.cmd == "eval-extraction":
+            eval_extraction()
+        elif args.cmd == "eval-search":
+            eval_search(db)
+        elif args.cmd == "embed-notes":
+            embed_notes(db, args.limit)
         elif args.cmd == "set-role":
             from app.api.v1.deps import ROLES
             if args.role not in ROLES:

@@ -11,7 +11,7 @@ import os
 from app.core.database import get_db
 from app.api.v1.deps import (
     get_current_user, get_current_admin, require_roles, get_accessible_patient, can_access_patient,
-    CLINICAL_WRITE_ROLES, REVIEW_ROLES, audit_read, rate_limited,
+    CLINICAL_WRITE_ROLES, REVIEW_ROLES, audit_read, rate_limited, deid,
 )
 from app.models.models import (
     User, Patient, Document, Summary, Entity, ICD10Mapping,
@@ -217,7 +217,7 @@ def get_patient_documents(
 ):
     """A patient's notes, newest clinical date first. At most `limit` (busy patients have
     1,000+); X-Total-Count gives the full number. `include` adds one specific note (e.g. from a link)."""
-    get_accessible_patient(patient_id, db, current_user)
+    patient = get_accessible_patient(patient_id, db, current_user)
     limit = max(1, min(limit, 500))
     base = db.query(Document).filter(Document.patient_id == patient_id)
     docs = (base.order_by(func.coalesce(Document.document_date, Document.upload_date).desc(), Document.document_id)
@@ -227,7 +227,7 @@ def get_patient_documents(
         if extra:
             docs.append(extra)
     response.headers["X-Total-Count"] = str(base.count())
-    return docs
+    return deid(current_user, patient, [DocumentResponse.model_validate(d).model_dump() for d in docs])
 
 
 @router.get("/{document_id}/insights", response_model=DocumentInsightsResponse)
@@ -238,7 +238,7 @@ def get_document_insights(
 ):
     doc = get_accessible_document(document_id, db, current_user)
     audit_read(db, current_user, "view_note_insights", f"Document ID: {document_id}")  # N-14: evidence = note text
-    return doc
+    return deid(current_user, doc.patient, DocumentInsightsResponse.model_validate(doc).model_dump())
 
 
 @router.post("/entities/{entity_id}/review", response_model=EntityResponse)
@@ -276,12 +276,12 @@ def get_redacted_document(
 
     note_entry = db.query(ClinicalNote).filter(ClinicalNote.document_id == document_id).first()
     if note_entry and note_entry.redacted_text:
-        return {
+        return deid(current_user, doc.patient, {
             "document_id": document_id,
             "original_text": note_entry.original_text if show_original else None,
             "redacted_text": note_entry.redacted_text,
             "redactions": []
-        }
+        })
 
     if note_entry:
         raw_text = note_entry.original_text
@@ -298,12 +298,12 @@ def get_redacted_document(
 
     if not show_original:  # N-13: each redaction carries the matched text; researchers get type + placeholder only
         redacted_entities = [{k: r[k] for k in ("entity_type", "redacted_text")} for r in redacted_entities]
-    return {
+    return deid(current_user, doc.patient, {
         "document_id": document_id,
         "original_text": raw_text if show_original else None,
         "redacted_text": redacted_text,
         "redactions": redacted_entities
-    }
+    })
 
 
 @router.get("/compare/{patient_id}")
@@ -313,7 +313,7 @@ def compare_patient_documents(
     current_user: User = Depends(get_current_user)
 ):
     """Earliest vs latest processed note, from reviewed entities only. Read-only (N-03)."""
-    get_accessible_patient(patient_id, db, current_user)
+    patient = get_accessible_patient(patient_id, db, current_user)
     docs = db.query(Document).filter(
         Document.patient_id == patient_id,
         Document.status == "completed"
@@ -421,7 +421,7 @@ def compare_patient_documents(
         # "added" / "resolved" etc. only mean "mentioned in one note and not the other".
         "pending_review": pending1 + pending2,
     }
-    return comparison_payload
+    return deid(current_user, patient, comparison_payload)
 
 
 @router.post("/{document_id}/process", status_code=status.HTTP_202_ACCEPTED)

@@ -1,0 +1,30 @@
+{"id": "q01", "query": "ear infection", "relevant": "otitis media|ear infection"}
+{"id": "q02", "query": "patients with diabetes", "relevant": "diabet"}
+{"id": "q03", "query": "high blood pressure", "relevant": "hypertension|hypertensive|high blood pressure"}
+{"id": "q04", "query": "broken bones", "relevant": "fracture"}
+{"id": "q05", "query": "sore throat", "relevant": "pharyngitis|sore throat|tonsillitis"}
+{"id": "q06", "query": "chest infection", "relevant": "bronchitis|pneumonia|chest infection"}
+{"id": "q07", "query": "tooth decay", "relevant": "dental caries|tooth decay"}
+{"id": "q08", "query": "gum disease", "relevant": "gingivitis|gingival disease|periodont"}
+{"id": "q09", "query": "pregnancy complications", "relevant": "pre-eclampsia|preeclampsia|eclampsia|miscarriage|tubal pregnancy|ectopic|blighted ovum|gestational|chromosomal abnormality|antepartum"}
+{"id": "q10", "query": "heart attack", "relevant": "myocardial infarction|heart attack"}
+{"id": "q11", "query": "kidney disease", "relevant": "kidney disease|renal|nephropathy|dialysis"}
+{"id": "q12", "query": "cholesterol lowering medication", "relevant": "statin\\b|simvastatin|atorvastatin|rosuvastatin|pravastatin|lovastatin|ezetimibe"}
+{"id": "q13", "query": "blood thinners", "relevant": "warfarin|heparin|clopidogrel|apixaban|rivaroxaban|dabigatran|enoxaparin|anticoagul"}
+{"id": "q14", "query": "opioid pain medication", "relevant": "oxycodone|hydrocodone|tramadol|morphine|fentanyl|codeine|hydromorphone|meperidine|alfentanil|remifentanil|buprenorphine|methadone"}
+{"id": "q15", "query": "asthma inhaler", "relevant": "albuterol|fluticasone|budesonide|salmeterol|ipratropium|inhaler|inhalation"}
+{"id": "q16", "query": "birth control", "relevant": "contracept|levonorgestrel|norethindrone|etonogestrel|medroxyprogesterone|norelgestromin|norgestimate|drospirenone|dienogest|desogestrel|intrauterine"}
+{"id": "q17", "query": "lung cancer", "relevant": "carcinoma of lung|lung cancer|neoplasm of lung|non-small cell|small cell carcinoma"}
+{"id": "q18", "query": "sinus infection", "relevant": "sinusitis|sinus infection"}
+{"id": "q19", "query": "urinary tract infection", "relevant": "cystitis|pyelonephritis|urinary tract infection"}
+{"id": "q20", "query": "obesity", "relevant": "obes|body mass index 30"}
+{"id": "q21", "query": "hay fever", "relevant": "allergic rhinitis|hay fever"}
+{"id": "q22", "query": "eczema", "relevant": "dermatitis|eczema"}
+{"id": "q23", "query": "HIV", "relevant": "human immunodeficiency virus|\\bhiv\\b"}
+{"id": "q24", "query": "stroke", "relevant": "stroke|cerebrovascular|cerebral infarction"}
+{"id": "q25", "query": "dementia", "relevant": "dementia|alzheimer"}
+{"id": "q26", "query": "COPD", "relevant": "chronic obstructive|emphysema|copd"}
+{"id": "q27", "query": "arthritis", "relevant": "arthritis|arthropathy"}
+{"id": "q28", "query": "cuts and wounds", "relevant": "laceration|wound"}
+{"id": "q29", "query": "low iron in the blood", "relevant": "anemia|anaemia|iron deficiency|ferrous"}
+{"id": "q30", "query": "antibiotics", "relevant": "amoxicillin|penicillin|cephalexin|ciprofloxacin|nitrofurantoin|doxycycline|azithromycin|cefuroxime|cefazolin|vancomycin|clindamycin|fosfomycin|ceftriaxone|clavulanate|trimethoprim|sulfamethoxazole|erythromycin|metronidazole|levofloxacin|cefdinir|ampicillin"}

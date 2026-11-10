@@ -4,7 +4,7 @@ from typing import List
 from app.core.database import get_db
 from app.api.v1.deps import (
     get_current_user, require_roles, get_accessible_patient, accessible_patient_ids,
-    CLINICAL_WRITE_ROLES, GOVERNANCE_ROLES, audit_read,
+    CLINICAL_WRITE_ROLES, GOVERNANCE_ROLES, audit_read, deid, patient_out,
 )
 from app.models.models import Patient, User
 from app.schemas.schemas import PatientCreate, PatientResponse, PatientListItem
@@ -62,8 +62,9 @@ def list_patients(
     # Two grouped queries give the list its context (notes, last encounter) without N+1 lookups.
     docs = dict(db.query(Document.patient_id, func.count(Document.document_id)).group_by(Document.patient_id).all())
     last = dict(db.query(Encounter.patient_id, func.max(Encounter.start_at)).group_by(Encounter.patient_id).all())
-    return [PatientListItem.model_validate(p).model_copy(update={
-        "document_count": docs.get(p.patient_id, 0), "last_encounter_at": last.get(p.patient_id)}) for p in patients]
+    return [patient_out(current_user, PatientListItem.model_validate(p).model_copy(update={
+        "document_count": docs.get(p.patient_id, 0), "last_encounter_at": last.get(p.patient_id)}).model_dump())
+            for p in patients]
 
 
 @router.get("/governance/stats")
@@ -120,7 +121,7 @@ def get_patient(
     current_user: User = Depends(get_current_user)
 ):
     patient = get_accessible_patient(patient_id, db, current_user)
-    return patient
+    return patient_out(current_user, PatientResponse.model_validate(patient).model_dump())
 
 
 @router.get("/{patient_id}/risk")
@@ -133,7 +134,7 @@ def get_patient_risk(
 
     from app.services.risk_assessor import risk_engine
     # Read-only: viewing a score must not create rows.
-    return risk_engine.calculate_patient_risk(patient_id, db)
+    return deid(current_user, patient, risk_engine.calculate_patient_risk(patient_id, db))
 
 
 GRAPH_MAX_PER_TYPE = 15
@@ -159,8 +160,10 @@ def get_patient_graph(
 
     nodes, edges, totals = [], [], {}
     patient_node_id = f"patient_{patient_id}"
-    nodes.append({"id": patient_node_id, "label": f"{patient.first_name} {patient.last_name}", "type": "Patient",
-                  "source": "record", "details": f"Born {patient.date_of_birth or 'unknown'} | {patient.gender}"})
+    shown = patient_out(current_user, PatientResponse.model_validate(patient).model_dump())
+    born = shown.get("birth_year") or shown["date_of_birth"] or "unknown"
+    nodes.append({"id": patient_node_id, "label": f"{shown['first_name']} {shown['last_name']}", "type": "Patient",
+                  "source": "record", "details": f"Born {born} | {patient.gender}"})
     seen: dict[tuple, str] = {}
 
     def add(node_type, label, source, details, edge_label, key=None):
@@ -220,13 +223,13 @@ def get_patient_graph(
             for m in groups.get("Medication", []):
                 edges.append({"source": c, "target": m, "label": "mentioned in same note"})  # co-occurrence only
 
-    return {
+    return deid(current_user, patient, {
         "nodes": nodes,
         "edges": edges,
         "pending_review": sum(pending.values()),
         "totals": totals,              # per type, before the display cap
         "max_per_type": GRAPH_MAX_PER_TYPE,
-    }
+    })
 
 
 def _iso(dt):
@@ -281,7 +284,7 @@ def get_patient_record(
         key=lambda e: e["at"], reverse=True,
     )[:limit]
 
-    return {
+    return deid(current_user, patient, {
         "patient_id": patient.patient_id,
         "source_system": patient.source_system,
         "date_of_birth_known": patient.date_of_birth is not None,
@@ -303,4 +306,4 @@ def get_patient_record(
                           "value": o.value, "unit": o.unit, "flag": o.flag, "reference_range": o.reference_range,
                           "effective_at": _iso(o.effective_at), **src(o)} for o in observations],
         "timeline": timeline,
-    }
+    })

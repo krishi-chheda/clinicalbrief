@@ -109,6 +109,16 @@ const EXAMPLE = [
   ["provenance", "imported"],
 ];
 
+// v1.0.1 Part B: from clinicalbrief-backend/eval/results/extraction-2026-11-10.json (40 notes, 352 labelled mentions).
+// Lenient = same type, one term contains the other ("insulin" ~ "insulin isophane ... [humulin]").
+const EVAL_ROWS: [string, string, string, string][] = [
+  ["All types", "0.96 (0.88-1.00)", "0.07 (0.04-0.09)", "24 of 352"],
+  ["Symptom", "1.00", "0.24 (0.12-0.32)", "7 of 29"],
+  ["Medication", "1.00", "0.13 (0.07-0.20)", "14 of 106"],
+  ["Disease", "0.67 (0.50-1.00)", "0.02 (0.00-0.05)", "2 of 123"],
+  ["Procedure", "1.00", "0.01 (0.00-0.04)", "1 of 94"],
+];
+
 export default function DataPage() {
   const root = useRef<HTMLDivElement>(null);
   useDataMotion(root);
@@ -189,6 +199,43 @@ export default function DataPage() {
         <p className="mt-6 text-sm text-[#4A5B38] max-w-3xl leading-relaxed">
           Not yet imported: Synthea immunisations, diagnostic reports, care plans and claims. From the Coherent dataset only the FHIR part is used; imaging, genomics and ECG data are not downloaded.
         </p>
+      </Section>
+
+      <Section id="evaluation" tone="pale" label="Accuracy, measured" title="How much the note pipeline finds">
+        <div className="space-y-4 text-[#18280E] leading-relaxed max-w-3xl">
+          <p>
+            The rule-based note pipeline was scored against 40 Synthea notes (one per patient, fixed random seed) with every
+            disease, symptom, medication, procedure and allergy labelled by hand, following a written guideline, 352 mentions in all.
+          </p>
+          <p>
+            <b className="font-semibold">What it finds is almost always right; it finds very little.</b> Its dictionary has about 60 terms, and Synthea
+            writes most conditions, drug products and procedures in words that are not in it (gingivitis, viral sinusitis, sodium fluoride gel,
+            medication reconciliation). Exact-term matching scores lower still (precision 0.28, recall 0.02), because the pipeline reports
+            &ldquo;insulin&rdquo; where the note says the full product name.
+          </p>
+        </div>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-[#B3C5A0]/70 bg-white max-w-3xl">
+          <table className="w-full text-sm text-left">
+            <thead className="lp-mono text-[11px] uppercase tracking-wider text-[#4A5B38]">
+              <tr><th className="px-4 py-3">Type (lenient match)</th><th className="px-4 py-3">Precision</th><th className="px-4 py-3">Recall</th><th className="px-4 py-3">Found</th></tr>
+            </thead>
+            <tbody className="divide-y divide-[#B3C5A0]/50 text-[#090F05]">
+              {EVAL_ROWS.map(([t, p, r, f]) => (
+                <tr key={t} className={t === "All types" ? "font-semibold" : ""}>
+                  <td className="px-4 py-2.5">{t}</td><td className="px-4 py-2.5 whitespace-nowrap">{p}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">{r}</td><td className="px-4 py-2.5 whitespace-nowrap">{f}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="mt-6 space-y-2 text-sm text-[#4A5B38] leading-relaxed max-w-3xl list-disc pl-5">
+          <li>Brackets are 95% bootstrap intervals over notes. No allergies were mentioned in the sample, so allergies are not measured.</li>
+          <li>The one wrong finding: &ldquo;diabetes&rdquo; reported as a disease from the procedure &ldquo;urine screening test for diabetes&rdquo;.</li>
+          <li>Negation and family-history handling are <b className="font-semibold">not</b> measured: these notes contain no negated or family mentions in scope.</li>
+          <li>Labels were drafted by an AI model (Claude) from the note text and the guideline, and have not yet been reviewed by a person.</li>
+          <li>Synthea notes are templated, so this says nothing about real clinical text. Reproduce with <Mono className="normal-case tracking-normal text-[12px]">py -3.12 -m app.cli eval-extraction</Mono>.</li>
+        </ul>
       </Section>
 
       <Section id="licences" tone="dark" label="Licences and attribution" title="Credit where it is due">

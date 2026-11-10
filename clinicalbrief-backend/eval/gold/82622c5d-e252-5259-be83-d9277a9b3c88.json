@@ -1,0 +1,85 @@
+{
+ "note_id": "82622c5d-e252-5259-be83-d9277a9b3c88",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "viral sinusitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "gingivitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "dental filling lost",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "amlodipine 2.5 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acetaminophen 325 mg oral tablet [tylenol]",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "sodium fluoride 0.0272 mg/mg oral gel",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "dental consultation and report",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "dental care",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "removal of supragingival plaque and calculus from all teeth using dental instrument",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "removal of subgingival plaque and calculus from all teeth using dental instrument",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "examination of gingivae",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "restoration of tooth with coverage of all cusps using dental filling material",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "oral health education",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

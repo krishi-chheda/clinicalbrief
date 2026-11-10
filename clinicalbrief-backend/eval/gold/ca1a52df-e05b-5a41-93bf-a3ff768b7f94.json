@@ -1,0 +1,79 @@
+{
+ "note_id": "ca1a52df-e05b-5a41-93bf-a3ff768b7f94",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "gingival disease",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "streptococcal sore throat",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute bronchitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute viral pharyngitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "gingivitis",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "penicillin v potassium 250 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acetaminophen 325 mg oral tablet",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "sodium fluoride 0.0272 mg/mg oral gel",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment of anxiety",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment of substance use",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "assessment using car, relax, alone, forget, friends, trouble screening test",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "anticipatory guidance",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

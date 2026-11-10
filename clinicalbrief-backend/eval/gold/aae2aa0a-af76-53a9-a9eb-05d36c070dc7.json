@@ -1,0 +1,31 @@
+{
+ "note_id": "aae2aa0a-af76-53a9-a9eb-05d36c070dc7",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "168 hr ethinyl estradiol 0.00146 mg/hr / norelgestromin 0.00625 mg/hr transdermal system",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "etonogestrel 68 mg drug implant",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "{7 (ethinyl estradiol 0.01 mg oral tablet) / 84 (ethinyl estradiol 0.03 mg / levonorgestrel 0.15 mg oral tablet) } pack [seasonique]",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "intramuscular injection",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

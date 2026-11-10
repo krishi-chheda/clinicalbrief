@@ -150,3 +150,35 @@ def get_accessible_patient(patient_id: str, db: Session, user: User) -> Patient:
     if not patient or not can_access_patient(user, patient):
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
+
+
+# --- v1.0.1 Part D: researchers see no direct identifiers -----------------------------------------------------------
+# Every endpoint a researcher can reach passes its response through one of these. Other roles are unchanged.
+
+def is_research_view(user: User) -> bool:
+    return user.role == "researcher"
+
+
+def deid(user: User, patient: Patient, obj):
+    """For researchers: `obj` (any JSON-like value) with this patient's names and birth date removed from every string."""
+    if not is_research_view(user):
+        return obj
+    from app.services.clinical_privacy import identifiers, scrub
+    return scrub(obj, identifiers(patient))
+
+
+def deid_items(user: User, db: Session, items: list, key: str = "patient_id") -> list:
+    """`deid` for a list of dicts that each belong to a patient (search results across patients)."""
+    if not is_research_view(user) or not items:
+        return items
+    ids = {i[key] for i in items}
+    patients = {p.patient_id: p for p in db.query(Patient).filter(Patient.patient_id.in_(ids))}
+    return [deid(user, patients[i[key]], i) if i[key] in patients else i for i in items]
+
+
+def patient_out(user: User, data: dict) -> dict:
+    """A serialised patient (PatientResponse fields): researchers get a pseudonym and the birth year only."""
+    if not is_research_view(user):
+        return data
+    from app.services.clinical_privacy import deidentify_patient
+    return deidentify_patient(data)

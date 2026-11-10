@@ -6,13 +6,16 @@
   insulin... Expansion only widens the search; every hit is a real row. Without the model, search is literal.
 - Medications are returned as dated events ("started" / "stopped"), so a date range shows medication changes.
 - Scope: only patients the user may access. Researchers get no note text (it is not de-identified).
+- "Match meaning" (v1.0.1, Postgres only): note hits are the keyword hits fused (reciprocal rank) with the notes nearest
+  to the question by local embeddings (migration 0014, `app.cli embed-notes`). Without the local model or embeddings it
+  falls back to keyword ranking and says so.
 """
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import and_, func, or_, literal, literal_column
+from sqlalchemy import and_, bindparam, column, func, or_, literal, literal_column, table, text
 from sqlalchemy.orm import Session
 
 from app.core.database import is_sqlite
@@ -29,6 +32,18 @@ class SearchResult:
     counts: dict = field(default_factory=dict)       # matches per kind (before the per-kind cap)
     terms: list = field(default_factory=list)        # what was actually searched for
     expanded: bool = False                           # True when the local model added terms
+    meaning: bool = False                            # True when notes were ranked by meaning (embeddings) too
+    meaning_note: Optional[str] = None               # why "match meaning" was not used, when it was asked for
+
+
+_NOTE_EMBEDDINGS = table("note_embeddings", column("document_id"))  # migration 0014; SQL only, not in the ORM
+
+
+def _has_embeddings(db: Session) -> bool:
+    """Migration 0014 applied and `embed-notes` run at least once."""
+    if not db.execute(text("SELECT to_regclass('public.note_embeddings') IS NOT NULL")).scalar():
+        return False
+    return bool(db.execute(text("SELECT EXISTS (SELECT 1 FROM note_embeddings)")).scalar())
 
 
 def _day_bounds(d_from: Optional[date], d_to: Optional[date]):
@@ -123,6 +138,27 @@ class RecordSearch:
                  "document_id": d.document_id, "source_system": d.source_system} for n, d, snip, r in rows]
         return total, hits
 
+    def notes_by_meaning(self, patient_id, lo, hi, cap, keyword_hits: list) -> list:
+        """Keyword hits fused with the `cap` notes nearest to the query by embedding (same scope and dates)."""
+        from app.services.embeddings import embed, rrf, shorten, to_pg
+        qv = to_pg(shorten(embed([self.query], "search_query"))[0])
+        when = func.coalesce(Document.document_date, Document.upload_date)
+        query_vec = bindparam("qv", qv).op("::")(literal_column("extensions.vector"))  # cosine distance, pgvector
+        dist = literal_column("note_embeddings.embedding").op("OPERATOR(extensions.<=>)")(query_vec)
+        q = (self.db.query(ClinicalNote, Document)
+             .join(Document, Document.document_id == ClinicalNote.document_id)
+             .join(_NOTE_EMBEDDINGS, _NOTE_EMBEDDINGS.c.document_id == Document.document_id)
+             .filter(*_in_range(when, lo, hi)))
+        near = self._scope(q, Document.patient_id, patient_id).order_by(dist).limit(cap).all()
+        by_id = {h["document_id"]: h for h in keyword_hits}
+        for n, d in near:
+            by_id.setdefault(d.document_id, {
+                "kind": "note", "date": _iso(d.document_date or d.upload_date), "patient_id": d.patient_id,
+                "label": d.file_name, "detail": d.classification, "snippet": self._snippet(n.original_text),
+                "document_id": d.document_id, "source_system": d.source_system, "by_meaning": True})
+        fused = rrf([[h["document_id"] for h in keyword_hits], [d.document_id for _, d in near]])[:cap]
+        return [{**by_id[i], "rank": 1 / (pos + 1)} for pos, i in enumerate(fused)]  # fused order, best first
+
     def simple(self, kind, model, text_col, date_col, patient_id, lo, hi, cap, detail):
         q = self.db.query(model).filter(self._match(text_col), *_in_range(date_col, lo, hi))
         q = self._scope(q, model.patient_id, patient_id)
@@ -153,7 +189,7 @@ class RecordSearch:
 
 def search_records(db: Session, allowed_patient_ids: Optional[set], query: str, extra_terms: Iterable[str] = (), *, patient_id=None,
                    kinds: Optional[set] = None, date_from: Optional[date] = None, date_to: Optional[date] = None,
-                   include_notes: bool = True, per_kind: int = 25, sort: str = "relevance") -> SearchResult:
+                   include_notes: bool = True, per_kind: int = 25, sort: str = "relevance", meaning: bool = False) -> SearchResult:
     query = (query or "").strip()[:200]
     extra = [t for t in dict.fromkeys(t.strip().lower() for t in extra_terms) if t and _WORD.search(t) and t != query.lower()][:15]
     result = SearchResult(terms=[query] + extra, expanded=bool(extra))
@@ -164,8 +200,26 @@ def search_records(db: Session, allowed_patient_ids: Optional[set], query: str, 
         kinds.discard("note")
     s = RecordSearch(db, allowed_patient_ids, query, extra)
     lo, hi = _day_bounds(date_from, date_to)
+    def note_runner():
+        total, hits = s.notes(patient_id, lo, hi, per_kind)
+        if not meaning:
+            return total, hits
+        from app.services.llm import LLMUnavailable
+        if is_sqlite:
+            result.meaning_note = "Match meaning needs the Postgres database: keyword ranking used."
+        elif not _has_embeddings(db):
+            result.meaning_note = "No note embeddings yet (run: py -3.12 -m app.cli embed-notes): keyword ranking used."
+        else:
+            try:
+                hits = s.notes_by_meaning(patient_id, lo, hi, per_kind, hits)
+                result.meaning = True
+                total = max(total, len(hits))
+            except LLMUnavailable:
+                result.meaning_note = "Local model unavailable: keyword ranking used (match meaning needs it)."
+        return total, hits
+
     runners = {
-        "note": lambda: s.notes(patient_id, lo, hi, per_kind),
+        "note": note_runner,
         "condition": lambda: s.simple("condition", Diagnosis, Diagnosis.display, Diagnosis.onset_at, patient_id, lo, hi, per_kind,
                                       lambda d: f"onset{f', {d.clinical_status}' if d.clinical_status else ''}"),
         "medication": lambda: s.medications(patient_id, lo, hi, per_kind),

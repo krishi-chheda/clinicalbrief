@@ -1785,6 +1785,12 @@ export default function ClinicalBriefApp() {
             <Menu className="h-5 w-5" />
           </button>
         </div>
+        {userRole === "researcher" && (
+          <div role="status" className="mb-6 px-4 py-2.5 rounded-xl border border-[#B3C5A0] bg-[#F7F9F4] dark:bg-white/5 dark:border-white/15 text-xs text-[#18280E] dark:text-[#DFE6D6]">
+            <b className="font-semibold">Research view:</b> direct identifiers removed (names, date of birth, date of death).
+            Clinical dates are kept. This is not a validated de-identification.
+          </div>
+        )}
         {isDemo && (
           <div role="status" className="mb-6 px-4 py-2.5 rounded-xl border border-[#B2EB76] bg-[#F4FAED] dark:bg-[#B2EB76]/10 dark:border-[#B2EB76]/30 text-xs text-[#18280E] dark:text-[#DFF5C4] flex flex-wrap items-center justify-between gap-2">
             <span>
@@ -2098,6 +2104,7 @@ export default function ClinicalBriefApp() {
               <span>{ageLabel(selectedPatient)}</span>
               <span className="capitalize">{selectedPatient.gender}</span>
               {selectedPatient.date_of_birth && <span>Born {formatDate(selectedPatient.date_of_birth)}</span>}
+              {!selectedPatient.date_of_birth && selectedPatient.birth_year && <span>Born {selectedPatient.birth_year}</span>}
               {selectedPatient.deceased_date && <span className="font-semibold text-red-700 dark:text-red-400">Deceased {formatDate(selectedPatient.deceased_date)}</span>}
               <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-medium">{sourceLabel(selectedPatient.source_system)}</span>
               <span className="font-mono text-xs text-slate-500" title={selectedPatient.patient_id}>ID {selectedPatient.patient_id.slice(0, 8)}</span>

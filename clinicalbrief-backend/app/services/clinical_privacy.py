@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Iterable
 
 class ClinicalPrivacyEngine:
     def __init__(self):
@@ -13,27 +13,12 @@ class ClinicalPrivacyEngine:
         self.email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b')
         self.mrn_pattern = re.compile(r'\bMRN-?\d{6,8}\b', re.IGNORECASE)
         self.insurance_pattern = re.compile(r'\bINS-?\d{8,10}\b', re.IGNORECASE)
-        
-        # Specific names list to strip (could be dynamic)
-        self.known_names = ["John Smith", "Clara Jones", "Smith John", "Jones Clara"]
 
     def redact_text(self, text: str) -> Tuple[str, List[Dict[str, Any]]]:
         redacted_text = text
         redacted_entities = []
 
-        # 1. Names
-        for name in self.known_names:
-            matches = re.finditer(re.escape(name), redacted_text, re.IGNORECASE)
-            for m in list(matches):
-                original = m.group()
-                redacted_text = redacted_text.replace(original, "[PATIENT_NAME]")
-                redacted_entities.append({
-                    "entity_type": "Patient Name",
-                    "original_text": original,
-                    "redacted_text": "[PATIENT_NAME]"
-                })
-
-        # 2. DOBs
+        # 1. DOBs (patient names: see redact_names below, which knows the patient)
         matches = self.dob_pattern.finditer(redacted_text)
         for m in list(matches):
             original = m.group()
@@ -104,3 +89,48 @@ class ClinicalPrivacyEngine:
         return redacted_text, redacted_entities
 
 privacy_engine = ClinicalPrivacyEngine()
+
+
+# --- v1.0.1 Part D: the researcher view ----------------------------------------------------------------------------
+# Direct identifiers removed: names, date of birth (year kept), date of death. Not a validated de-identification:
+# clinical dates in the structured record are kept, and free text is only cleaned of this patient's own name and
+# birth date plus the regex patterns above.
+
+def pseudonym(patient_id: str) -> str:
+    """Stable label for a patient. Researchers already see the random patient id (it is in every URL), so the
+    pseudonym is derived from it rather than from a secret."""
+    return f"Patient {patient_id[:8].upper()}"
+
+
+def deidentify_patient(data: dict) -> dict:
+    dob = data.get("date_of_birth")
+    return {**data, "first_name": "Patient", "last_name": data["patient_id"][:8].upper(),
+            "date_of_birth": None, "birth_year": dob.year if dob else None, "deceased_date": None, "deidentified": True}
+
+
+def identifiers(patient) -> List[str]:
+    """The strings that identify this patient in free text: names and the birth date in common formats."""
+    out = [patient.first_name, patient.last_name]
+    if patient.date_of_birth:
+        d = patient.date_of_birth
+        out += [d.isoformat(), d.strftime("%d/%m/%Y"), d.strftime("%m/%d/%Y")]
+    return out
+
+
+def redact_names(text: str, names: Iterable[str]) -> str:
+    """Replaces each name as a whole word, case-insensitively and literally (never as a regex)."""
+    for name in {n.strip() for n in names if n and len(n.strip()) >= 2}:
+        text = re.sub(r"(?<!\w)" + re.escape(name) + r"(?!\w)", "[NAME]", text, flags=re.IGNORECASE)
+    return text
+
+
+def scrub(obj: Any, names: Iterable[str]) -> Any:
+    """`redact_names` over every string inside a JSON-like value (dicts, lists, strings)."""
+    names = list(names)
+    if isinstance(obj, str):
+        return redact_names(obj, names)
+    if isinstance(obj, dict):
+        return {k: scrub(v, names) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [scrub(v, names) for v in obj]
+    return obj

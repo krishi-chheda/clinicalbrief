@@ -39,6 +39,8 @@ class PatientResponse(PatientBase):
     patient_id: str
     date_of_birth: Optional[date] = None   # not every source publishes a birth date
     deceased_date: Optional[date] = None
+    birth_year: Optional[int] = None       # researchers only: date_of_birth is withheld (v1.0.1 Part D)
+    deidentified: bool = False             # True: name is a pseudonym, birth date reduced to the year
     source_system: Optional[str] = None
     created_at: datetime
 

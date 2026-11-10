@@ -1,0 +1,19 @@
+{
+ "note_id": "a4b2186f-6bad-5fe7-aab7-028375a316a1",
+ "labelled_by": "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "joint pain",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "acute st segment elevation myocardial infarction",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

@@ -90,8 +90,8 @@ function Bullets({ items, dark = false }: { items: React.ReactNode[]; dark?: boo
 }
 
 const LIMITS: { title: string; body: string }[] = [
-  { title: "Redaction is regex only", body: "PHI redaction matches patterns (dates, US and Australian phone numbers, emails, record and insurance numbers). It is not a validated de-identification method; names, addresses and Medicare numbers are not detected." },
-  { title: "Some outputs are not de-identified", body: "Only the note-text view is redacted. Copilot citations, entity evidence sentences and patient demographics are shown as stored." },
+  { title: "Redaction is regex only", body: "PHI redaction matches patterns (dates, US and Australian phone numbers, emails, record and insurance numbers). It is not a validated de-identification method; addresses and Medicare numbers are not detected." },
+  { title: "The research view is not anonymous", body: "Researchers see a pseudonym, the birth year only and text with the patient's own names removed. Clinical dates are kept and other people named in a note are not detected, so this is not a validated de-identification. Other roles see records as stored." },
   { title: "Copilot sessions are hard-deleted", body: "Deleting a session removes the transcript permanently; what the AI said cannot be reconstructed. The audit log keeps who deleted it, for which patient. A clinical deployment would need retention instead." },
   { title: "A prototype, not a certified system", body: "No certification, compliance audit or penetration test has been done. It is a research and portfolio project, not a medical device, and runs on synthetic data only." },
 ];

@@ -194,3 +194,12 @@ def test_cli_main_runs_commands_that_skip_the_target_banner(client, argv, capsys
     except SystemExit:
         pass  # flag-demo exits when no patient qualifies; reaching it means main() got past the bug
     capsys.readouterr()
+
+
+def test_demo_rank_prefers_smaller_records():
+    """v1.0.1 P-5: with equal reviewed findings, the lighter record wins (the old order favoured the biggest)."""
+    from app.cli import demo_rank
+    small = {"reviewed": 4, "notes": 3, "labs": 20, "conditions": 5, "medications": 2}
+    huge = {"reviewed": 4, "notes": 40, "labs": 2900, "conditions": 60, "medications": 30}
+    more_reviewed = {**huge, "reviewed": 5}
+    assert sorted([huge, small, more_reviewed], key=demo_rank) == [more_reviewed, small, huge]

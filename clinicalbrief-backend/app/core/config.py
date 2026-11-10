@@ -8,7 +8,7 @@ load_dotenv(BACKEND_DIR / ".env")
 
 class Settings:
     PROJECT_NAME: str = "ClinicalBrief API"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.0.1"
     API_V1_STR: str = "/api/v1"
 
     # Supabase project (e.g. https://<ref>.supabase.co). Used to fetch JWKS for token verification.

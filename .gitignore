@@ -21,3 +21,8 @@ node_modules/
 
 # Launch videos and their render workspaces (/brag)
 brag-output*/
+
+# Evaluation note texts: regenerated from the local Synthea import (app.cli eval-sample), like all data
+clinicalbrief-backend/eval/notes/
+clinicalbrief-backend/eval/search/pg/
+clinicalbrief-backend/eval/search/cache/

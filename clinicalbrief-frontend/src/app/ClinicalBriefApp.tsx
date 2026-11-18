@@ -1166,18 +1166,26 @@ export default function ClinicalBriefApp() {
     checkBackendHealth();
   }, []);
 
-  const checkBackendHealth = async () => {
+  // Local development can start the backend; a live visitor can only wait (the hosted API sleeps when idle).
+  const apiUnreachableMessage = () => {
+    const host = new URL(BACKEND_URL).hostname;
+    return host === "localhost" || host === "127.0.0.1"
+      ? `The ClinicalBrief API (${new URL(BACKEND_URL).host}) is unreachable. Start the backend and try again.`
+      : "The ClinicalBrief API may be waking up. Try again in a minute.";
+  };
+
+  // Returns whether the API answered, so sign-in can re-check instead of trusting the result from page load.
+  const checkBackendHealth = async (): Promise<boolean> => {
     try {
       const res = await fetch(`${BACKEND_URL}/`);
       if (res.ok) {
         setAiMode((await res.json()).ai_mode ?? null);
         setIsBackendOnline(true);
-      } else {
-        setIsBackendOnline(false);
+        return true;
       }
-    } catch (e) {
-      setIsBackendOnline(false);
-    }
+    } catch { /* unreachable: network, CORS or the API asleep */ }
+    setIsBackendOnline(false);
+    return false;
   };
 
   useEffect(() => {
@@ -1483,8 +1491,8 @@ export default function ClinicalBriefApp() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!isBackendOnline) {
-      setLoginError("The ClinicalBrief API is unreachable. Start the backend and try again.");
+    if (!isBackendOnline && !(await checkBackendHealth())) {
+      setLoginError(apiUnreachableMessage());
       return;
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email: userEmail, password });
@@ -1516,7 +1524,7 @@ export default function ClinicalBriefApp() {
   // "Try the demo": anonymous sign-in; the signup trigger gives anonymous users the read-only `demo` role.
   // Hidden unless NEXT_PUBLIC_DEMO_ENABLED=true (switched off for now; the backend, migration 0012 and tests stay).
   const handleTryDemo = async (captchaToken?: string): Promise<string | null> => {
-    if (!isBackendOnline) return "The ClinicalBrief API is unreachable right now. Please try again in a minute.";
+    if (!isBackendOnline && !(await checkBackendHealth())) return apiUnreachableMessage();
     const { data, error } = await supabase.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
     if (error || !data.session) {
       return /anonymous/i.test(error?.message || "") ? "The public demo is not switched on yet." : error?.message || "Could not start the demo.";

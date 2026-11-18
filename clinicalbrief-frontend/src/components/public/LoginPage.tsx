@@ -1,8 +1,8 @@
 // Sign-in page: public-site header, a forest panel with what to expect, and the sign-in form.
 // Contract below is fixed (ClinicalBriefApp passes these props).
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { gsap } from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
@@ -23,7 +23,7 @@ export interface LoginPageProps {
   onEmailChange: (v: string) => void;
   password: string;
   onPasswordChange: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent) => void | Promise<void>;
   error: string | null;
   onTryDemo?: (captchaToken?: string) => Promise<string | null>;  // anonymous read-only demo (no account needed)
 }
@@ -40,6 +40,14 @@ const INPUT = "mt-2 w-full rounded-md border border-[#B3C5A0] bg-white px-3.5 py
 
 export default function LoginPage({ email, onEmailChange, password, onPasswordChange, onSubmit, error, onTryDemo }: LoginPageProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  // While a sign-in runs the button says so and ignores further clicks (a retry used to look like nothing happened).
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try { await onSubmit(e); } finally { setBusy(false); }
+  };
 
   // Entrance + ambient ECG loop.
   useGSAP(() => {
@@ -57,14 +65,15 @@ export default function LoginPage({ email, onEmailChange, password, onPasswordCh
     });
   }, { scope: rootRef });
 
-  // Error feedback: short firm shake (no overshoot) and the alert fades in. Same message twice = no re-shake.
+  // Error feedback: short firm shake (no overshoot) and the alert fades in. Runs on every failed attempt (busy ends),
+  // not only when the message text changes, so a repeated failure is still visible.
   useGSAP(() => {
-    if (!error) return;
+    if (!error || busy) return;
     gsap.matchMedia().add(MOTION_OK, () => {
       gsap.to(".lg-card", { keyframes: { x: [0, -8, 8, -6, 6, 0] }, duration: 0.36, ease: "none" });
       gsap.from(".lg-alert", { opacity: 0, y: -4, duration: 0.3, ease: "power3.out" });
     });
-  }, { scope: rootRef, dependencies: [error] });
+  }, { scope: rootRef, dependencies: [error, busy] });
 
   return (
     <div ref={rootRef} className="lp bg-white text-[#090F05] min-h-screen">
@@ -97,7 +106,7 @@ export default function LoginPage({ email, onEmailChange, password, onPasswordCh
               Use the account your administrator set up. Roles ({ROLES.join(", ")}) are assigned by an administrator.
             </p>
 
-            <form onSubmit={onSubmit} className="mt-8 space-y-5">
+            <form onSubmit={submit} className="mt-8 space-y-5">
               <div>
                 <label htmlFor="login-email" className="lp-mono text-[12px] uppercase tracking-[0.12em] text-[#18280E]">Email</label>
                 <input id="login-email" type="email" required autoComplete="email" placeholder="you@example.com"
@@ -111,9 +120,11 @@ export default function LoginPage({ email, onEmailChange, password, onPasswordCh
               {error && (
                 <p role="alert" className="lg-alert rounded-md border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-800">{error}</p>
               )}
-              <button type="submit"
-                className="group w-full inline-flex items-center justify-center gap-2 rounded-md bg-[#090F05] px-4 py-3.5 lp-mono text-[13px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#18280E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B2EB76] focus-visible:ring-offset-2">
-                Sign in <ArrowRight className="h-4 w-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
+              <button type="submit" disabled={busy} aria-busy={busy}
+                className="group w-full inline-flex items-center justify-center gap-2 rounded-md bg-[#090F05] px-4 py-3.5 lp-mono text-[13px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#18280E] disabled:cursor-wait disabled:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B2EB76] focus-visible:ring-offset-2">
+                {busy
+                  ? <>Signing in <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /></>
+                  : <>Sign in <ArrowRight className="h-4 w-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" /></>}
               </button>
             </form>
 

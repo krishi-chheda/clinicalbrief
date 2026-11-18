@@ -1,0 +1,31 @@
+{
+ "note_id": "n20",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "fever",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "rash",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "otitis media",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "amoxicillin",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

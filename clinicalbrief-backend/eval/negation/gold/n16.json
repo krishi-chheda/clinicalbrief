@@ -1,0 +1,25 @@
+{
+ "note_id": "n16",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "type 2 diabetes",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "metformin",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "insulin",
+   "type": "Medication",
+   "negated": true,
+   "subject": "patient"
+  }
+ ]
+}

@@ -100,14 +100,15 @@ const BOARD: { title: string; tone: string; items: [string, string][] }[] = [
   { title: "Prototype", tone: "bg-[#EBE46A] text-[#333109]", items: [
     ["Grounded Copilot", "Local model only; cites sources, flags unsupported claims"],
     ["Entity extraction", "Rule-based dictionary with negation and family-history checks"],
-    ["ICD-10 suggestions", "Exact match against a small dictionary; the rest stays unmapped"],
+    ["ICD-10 suggestions", "Dictionary and ICD-10-CM term matches; the rest stays unmapped"],
+    ["Extraction scores", "Preliminary, on synthetic notes against AI-drafted labels; no clinical accuracy claimed"],
+    ["Meaning search", "Local embeddings, kept because they beat full-text search on a fixed question set"],
+    ["De-identified research view", "Pseudonyms and birth year only for researchers; not a validated method"],
     ["Knowledge graph", "From the record plus reviewed findings only"],
     ["PHI redaction", "Regex patterns; not a validated de-identification method"],
   ] },
   { title: "Not built yet", tone: "bg-white text-[#4A5B38] border border-[#B3C5A0]", items: [
-    ["Accuracy evaluation", "No accuracy figure is shown until measured on a labelled set"],
-    ["Semantic search", "Embeddings, kept only if they beat full-text search on a fixed question set"],
-    ["De-identified research view", "Researchers get no note text until one exists"],
+    ["Clinical validation", "No accuracy is claimed on real clinical text; that needs person-reviewed labels"],
   ] },
 ];
 
@@ -384,7 +385,7 @@ export default function Landing({ onSignIn, onTryDemo }: { onSignIn: () => void;
                 </div>
                 <div>
                   <SearchScene />
-                  <p className="mt-3 lp-mono text-[11px] uppercase tracking-[0.1em] text-[#B3C5A0]">35,103 synthetic notes searchable · keyword full-text search, not a semantic model</p>
+                  <p className="mt-3 lp-mono text-[11px] uppercase tracking-[0.1em] text-[#B3C5A0]">35,103 synthetic notes searchable · keyword full-text search · optional meaning match with a local model</p>
                 </div>
               </div>
 

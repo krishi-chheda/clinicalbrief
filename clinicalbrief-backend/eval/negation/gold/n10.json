@@ -1,0 +1,25 @@
+{
+ "note_id": "n10",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "myocardial infarction",
+   "type": "Disease",
+   "negated": false,
+   "subject": "family"
+  },
+  {
+   "text": "hyperlipidemia",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "atorvastatin",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

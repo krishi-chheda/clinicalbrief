@@ -1,0 +1,19 @@
+{
+ "note_id": "n21",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "sulfa drugs",
+   "type": "Allergy",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "latex",
+   "type": "Allergy",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

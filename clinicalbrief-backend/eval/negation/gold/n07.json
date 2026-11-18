@@ -1,0 +1,19 @@
+{
+ "note_id": "n07",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "warfarin",
+   "type": "Medication",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "apixaban",
+   "type": "Medication",
+   "negated": true,
+   "subject": "patient"
+  }
+ ]
+}

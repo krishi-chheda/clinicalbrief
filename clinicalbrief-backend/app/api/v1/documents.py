@@ -262,6 +262,22 @@ def review_entity(
     return entity
 
 
+@router.get("/{document_id}/record-links")
+def get_record_links(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """v1.0.1: the patient's own coded record items (conditions, medications, procedures, allergies) this note
+    mentions by name. Linking, not AI extraction: nothing here needs review, and it can only find what the record has."""
+    from app.services.record_linking import record_links
+    doc = get_accessible_document(document_id, db, current_user)
+    audit_read(db, current_user, "view_note_links", f"Document ID: {document_id}")
+    note = db.query(ClinicalNote).filter(ClinicalNote.document_id == document_id).first()
+    links = record_links(db, doc.patient_id, note.original_text) if note else []
+    return deid(current_user, doc.patient, {"document_id": document_id, "links": links})
+
+
 @router.get("/{document_id}/redacted")
 def get_redacted_document(
     document_id: str,

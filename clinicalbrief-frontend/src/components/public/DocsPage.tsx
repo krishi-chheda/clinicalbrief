@@ -311,7 +311,8 @@ npm audit --omit=dev`}</Cmd>
                 <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
                     ["Honesty labels", "Every feature is marked Implemented, Prototype or Not built in the README."],
-                    ["No fabricated metrics", "No accuracy figure is shown anywhere until it is measured on a labelled set. Rates on the governance page are shares of human decisions, not accuracy."],
+                    ["No fabricated metrics", "No figure is shown that was not measured. The extraction scores are preliminary: synthetic notes, AI-drafted labels not yet reviewed by a person, no clinical accuracy claimed. Rates on the governance page are shares of human decisions, not accuracy."],
+                    ["Nothing clinical on the device", "The installable app stores only its shell (code, icons, an offline page and the pages you open, which hold no patient data). The API and Supabase are never stored by the service worker (src/lib/pwa/cache-policy.ts, unit-tested), and stored pages are deleted on sign-out. Records need a connection."],
                     ["Human review first", "AI output is never treated as fact until a person approves or edits it. The graph, FHIR export, Copilot structured answers and risk score use reviewed entities only."],
                   ].map(([t, d]) => (
                     <li key={t} className="rounded-2xl border border-[#B3C5A0]/60 p-5">

@@ -1,0 +1,19 @@
+{
+ "note_id": "n12",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "abdominal pain",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "diarrhea",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

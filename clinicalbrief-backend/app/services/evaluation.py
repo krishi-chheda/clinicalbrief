@@ -6,7 +6,8 @@ The unit is what the pipeline outputs: per note, the set of (term, type) it repo
 
 - strict: same normalised term and same type.
 - lenient: same type, and one term contains the other as whole words ("diabetes mellitus" ~ "type 2 diabetes mellitus").
-Each gold target is matched at most once. A prediction that hits a negated or family-history gold mention is a false
+Each gold target is matched at most once; in lenient mode, further predicted parts of an already matched mention
+(the ingredients of one combination product) are neither hits nor false positives. A prediction that hits a negated or family-history gold mention is a false
 positive and is also counted as a negation / subject error.
 """
 import random
@@ -17,9 +18,12 @@ from typing import Optional
 _TAG = re.compile(r"\s*\((disorder|finding|situation|procedure|substance|product|morphologic abnormality)\)\s*$", re.I)
 
 
+_WORDS = re.compile(r"[a-z0-9]+(?:['.-][a-z0-9]+)*")
+
+
 def mention_key(m: dict) -> tuple[str, str]:
-    text = _TAG.sub("", m["text"]).lower()
-    return " ".join(text.split()), m["type"]
+    """Lower-case words only: punctuation never decides a match ("(ethinyl estradiol" contains "ethinyl estradiol")."""
+    return " ".join(_WORDS.findall(_TAG.sub("", m["text"]).lower())), m["type"]
 
 
 def _contains(a: str, b: str) -> bool:
@@ -48,6 +52,8 @@ def _note_counts(gold: list, pred: list, mode: str):
             used[hit] = True
             counts[key[1]][0] += 1
             continue
+        if mode == "lenient" and any(used[i] and t[1] == key[1] and _contains(t[0], key[0]) for i, t in enumerate(targets)):
+            continue  # another part of a mention already matched (each ingredient of a combination product)
         counts[key[1]][1] += 1
         wrong = next((g for k, g in non_targets
                       if k[1] == key[1] and (k == key or (mode == "lenient" and _contains(k[0], key[0])))), None)
@@ -115,13 +121,17 @@ def _is_target(m: dict) -> bool:
     return not m.get("negated") and m.get("subject", "patient") == "patient"
 
 
-def run_extraction_eval(eval_dir, n_boot: int = 1000) -> dict:
-    """Runs the note pipeline on every labelled note and scores it (strict and lenient, with 95% CIs)."""
+def run_extraction_eval(eval_dir, n_boot: int = 1000, vocab: Optional[str] = None) -> dict:
+    """Runs the note pipeline on every labelled note in a set (a folder with notes/ and gold/, and optionally
+    sample.json listing the notes) and scores it (strict and lenient, with 95% CIs)."""
     import json
     from pathlib import Path
-    from app.services.ai_pipeline import ai_orchestrator
+    from app.services.ai_pipeline import AIPipelineOrchestrator
+    ai_orchestrator = AIPipelineOrchestrator(vocab=vocab)
     eval_dir = Path(eval_dir)
-    ids = json.loads((eval_dir / "sample.json").read_text(encoding="utf-8"))["note_ids"]
+    sample = eval_dir / "sample.json"
+    ids = (json.loads(sample.read_text(encoding="utf-8"))["note_ids"] if sample.exists()
+           else sorted(p.stem for p in (eval_dir / "gold").glob("*.json")))
     gold, pred, labelled, reviewed = {}, {}, set(), set()
     for i in ids:
         g = eval_dir / "gold" / f"{i}.json"
@@ -136,7 +146,7 @@ def run_extraction_eval(eval_dir, n_boot: int = 1000) -> dict:
     out = {"notes": len(gold), "gold_mentions": sum(len(v) for v in gold.values()),
            "targets": sum(_is_target(m) for v in gold.values() for m in v),
            "labelled_by": sorted(labelled), "reviewed_by": sorted(reviewed),
-           "pipeline": "rule-based (USE_MOCK_MODELS=true)" if ai_orchestrator.use_mock else "transformer"}
+           "pipeline": (f"rule-based, {ai_orchestrator.vocab} vocabulary" if ai_orchestrator.use_mock else "transformer")}
     for mode in ("strict", "lenient"):
         r = score(gold, pred, mode)
         for m in ("precision", "recall", "f1"):
@@ -160,3 +170,34 @@ def _examples(gold: dict, pred: dict, limit: int = 15) -> dict:
         wrong.update(preds - targets)
     fmt = lambda c: [{"text": k[0], "type": k[1], "notes": n} for k, n in c.most_common(limit)]
     return {"missed": fmt(missed), "false_positives": fmt(wrong)}
+
+
+_LINK_TYPES = {"condition": ("Disease", "Symptom"), "medication": ("Medication",), "procedure": ("Procedure",),
+               "allergy": ("Allergy",)}
+
+
+def linking_coverage(db, eval_dir) -> dict:
+    """Record linking (round 2, B) on the labelled set: the share of labelled patient mentions it links, and how many
+    links are not labelled mentions (e.g. social findings the guideline excludes). Coverage, not accuracy: on Synthea
+    the notes are written from the very record being linked."""
+    import json
+    from pathlib import Path
+    from app.models.models import Document
+    from app.services.record_linking import record_links
+    eval_dir = Path(eval_dir)
+    targets = linked_targets = extra = 0
+    per_type = defaultdict(lambda: [0, 0])
+    for g in sorted((eval_dir / "gold").glob("*.json")):
+        doc = json.loads(g.read_text(encoding="utf-8"))
+        text = (eval_dir / "notes" / f"{doc['note_id']}.txt").read_text(encoding="utf-8")
+        patient_id = db.get(Document, doc["note_id"]).patient_id
+        links = [(mention_key({"text": l["name"], "type": ""})[0], _LINK_TYPES[l["kind"]]) for l in record_links(db, patient_id, text)]
+        gold = [mention_key(m) for m in doc["mentions"] if _is_target(m)]
+        for term, typ in gold:
+            hit = any(typ in types and _contains(term, name) for name, types in links)
+            targets += 1; linked_targets += hit
+            per_type[typ][0] += 1; per_type[typ][1] += hit
+        extra += sum(not any(t in types and _contains(term, name) for term, t in gold) for name, types in links)
+    return {"notes": len(list((eval_dir / "gold").glob("*.json"))), "targets": targets, "linked": linked_targets,
+            "coverage": linked_targets / targets if targets else None, "links_not_labelled": extra,
+            "by_type": {t: {"targets": n, "linked": k, "coverage": k / n if n else None} for t, (n, k) in sorted(per_type.items())}}

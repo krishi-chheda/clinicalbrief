@@ -105,3 +105,10 @@ def test_search_is_audited_without_the_query(client, auth, world):
 
 def test_inaccessible_patient_filter_is_404(client, auth, world):
     assert search(client, auth, query="cough", patient_id=world["other"]).status_code == 404
+
+
+def test_snippet_marks_whole_words_only():
+    from app.services.record_search import RecordSearch
+    s = RecordSearch(None, None, "ear infection", ["otitis media"])
+    snip = s._snippet("Darren is a 12 year-old male. Patient has a history of otitis media.")
+    assert "y⟦ear⟧" not in snip and "⟦otitis media⟧" in snip

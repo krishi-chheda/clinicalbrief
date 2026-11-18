@@ -1,0 +1,25 @@
+{
+ "note_id": "n02",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "diabetes mellitus",
+   "type": "Disease",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "hypertension",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "lisinopril",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

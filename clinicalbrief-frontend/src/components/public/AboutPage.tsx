@@ -1,6 +1,6 @@
 // /about: what ClinicalBrief is, how it works, architecture, principles, who built it.
 // Every claim matches README.md ("What is implemented", "Architecture", "Copilot", "Roles and security model",
-// "Known gaps"). No metrics, users or accuracy figures: none have been measured.
+// "Known gaps"). No users or clinical accuracy figures; the only scores are the preliminary ones on the Data page.
 "use client";
 import React, { useRef } from "react";
 import Link from "next/link";
@@ -24,7 +24,7 @@ const STEPS = [
 ];
 
 const PRINCIPLES = [
-  { t: "Honesty over polish", d: "Each feature is labelled Implemented, Prototype or Not built. No accuracy figure is shown until one is measured on a labelled set." },
+  { t: "Honesty over polish", d: "Each feature is labelled Implemented, Prototype or Not built. Scores are shown only as measured: preliminary, on synthetic notes, against AI-drafted labels not yet reviewed by a person." },
   { t: "Human review first", d: "AI output is never treated as fact until a person approves or edits it. The graph, FHIR export, Copilot structured answers and risk score use reviewed findings only." },
   { t: "Data stays on the machine", d: "The Copilot only accepts a locally run model on a loopback address. Patient data is never sent to a cloud AI model." },
   { t: "Audited", d: "Review decisions, exports, and reads of clinical data (records, note text, AI output, Copilot questions) are logged: who and which record, never the content." },
@@ -203,8 +203,8 @@ export default function AboutPage() {
           on <a href={CONTACT.github} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-[#3F7308]">GitHub</a>.
         </p>
         <p className="mt-4 max-w-2xl text-[#4A5B38] leading-relaxed">
-          Not a medical device and not for patient care. No clinical validation, accuracy evaluation or regulatory
-          compliance is claimed.
+          Not a medical device and not for patient care. No clinical validation, clinical accuracy or regulatory compliance is
+          claimed; the extraction scores on the Data page are preliminary, on synthetic notes, against AI-drafted labels.
         </p>
       </Section>
 

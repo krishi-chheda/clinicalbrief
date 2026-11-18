@@ -71,7 +71,7 @@ def _gets(n):
             ("GET", f"/api/v1/patients/{pid}/record", None), ("GET", f"/api/v1/patients/{pid}/graph", None),
             ("GET", f"/api/v1/patients/{pid}/risk", None), ("GET", f"/api/v1/documents/patient/{pid}", None),
             ("GET", f"/api/v1/documents/{doc}/insights", None), ("GET", f"/api/v1/documents/{doc}/redacted", None),
-            ("GET", f"/api/v1/documents/compare/{pid}", None),
+            ("GET", f"/api/v1/documents/compare/{pid}", None), ("GET", f"/api/v1/documents/{doc}/record-links", None),
             ("POST", "/api/v1/search/records", {"query": "hypertension", "expand": False}),
             ("POST", "/api/v1/search/query", {"query": "chest pain hypertension"}),
             ("POST", "/api/v1/search/query", {"query": "chest pain", "patient_id": pid}),

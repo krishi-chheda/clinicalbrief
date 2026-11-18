@@ -15,7 +15,14 @@
 """
 import argparse
 import json
+import os
 import sys
+
+# Commands that only read and write files never need a database: give them a throwaway in-memory one, so they run
+# without DATABASE_URL and can never touch the live database configured in .env.
+_NO_DB = {"build-vocab", "eval-review", "eval-mark-reviewed", "eval-extraction"}
+if len(sys.argv) > 1 and sys.argv[1] in _NO_DB:
+    os.environ["DATABASE_URL"] = "sqlite://"
 from collections import Counter
 from pathlib import Path
 
@@ -141,10 +148,12 @@ def eval_sample(db, count: int, seed: int, resample: bool):
         sys.exit(f"{len(missing)} notes are not in this database (import the Synthea sample first), e.g. {missing[0]}")
 
 
-def eval_extraction():
+def eval_extraction(set_name: str = "synthea40", vocab: str = None):
     from datetime import date
+    from app.core.config import settings
     from app.services.evaluation import run_extraction_eval
-    r = run_extraction_eval(EVAL_DIR)
+    vocab = vocab or settings.EXTRACTION_VOCAB
+    r = run_extraction_eval(EVAL_DIR if set_name == "synthea40" else EVAL_DIR / set_name, vocab=vocab)
     f = lambda v: "  -  " if v is None else f"{v:.2f}"
     ci = lambda c: "" if c[0] is None else f" [{c[0]:.2f}-{c[1]:.2f}]"
     print(f"{r['notes']} notes, {r['targets']} target mentions ({r['gold_mentions']} labelled); pipeline: {r['pipeline']}; "
@@ -157,7 +166,7 @@ def eval_extraction():
         for t, v in r[mode]["by_type"].items():
             print(f"  {t:11} P {f(v['precision'])}{ci(v['precision_ci95'])}  R {f(v['recall'])}{ci(v['recall_ci95'])}"
                   f"  (tp {v['tp']}, fp {v['fp']}, fn {v['fn']})")
-    out = EVAL_DIR / "results" / f"extraction-{date.today().isoformat()}.json"
+    out = EVAL_DIR / "results" / f"extraction-{set_name}-{vocab}-{date.today().isoformat()}.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(r, indent=1), encoding="utf-8")
     print(f"\nwritten {out}")
@@ -195,6 +204,60 @@ def eval_search_db(source: Path):
                                 [[fix(c, r[c]) for c in keep] for r in rows])
             print(f"  {table:15} {len(rows):>6}")
     print(f"\nRun the comparison against it:\n  DATABASE_URL={uri} py -3.12 -m app.cli eval-search")
+
+
+def build_vocab(source: Path):
+    """Writes app/data/terminology.tsv from the CMS ICD-10-CM order file (zip) and the RxNav ingredient list (JSON)."""
+    import zipfile
+    from app.services.terminology import TSV, build_terms
+    zf = zipfile.ZipFile(source / "icd10cm.zip")
+    order = next(n for n in zf.namelist() if n.endswith(".txt") and "order" in n and "addenda" not in n)
+    icd = [(line[6:14].strip(), line[77:].strip()) for line in zf.read(order).decode("latin-1").splitlines() if len(line) > 77]
+    rx = [c["name"] for c in json.loads((source / "rxnorm_in.json").read_text(encoding="utf-8"))["minConceptGroup"]["minConcept"]]
+    terms = build_terms(icd, rx)
+    TSV.parent.mkdir(exist_ok=True)
+    TSV.write_text("term\ttype\tcode\tsource\tdescription\n" + "".join(
+        f"{t}\t{typ}\t{code or ''}\t{src}\t{desc}\n" for t, typ, code, src, desc in terms), encoding="utf-8")
+    by = Counter(typ for _, typ, *_ in terms)
+    print(f"{len(icd)} ICD-10-CM entries ({order}), {len(rx)} RxNorm ingredients -> {len(terms)} terms {dict(by)}")
+    print(f"written {TSV} ({TSV.stat().st_size // 1024} KB)")
+
+
+def eval_review(set_name: str):
+    """Writes eval/review-<set>.html: each note beside its labels, for the author's review (gitignored: note text)."""
+    import html
+    base = EVAL_DIR if set_name == "synthea40" else EVAL_DIR / set_name
+    rows = []
+    for g in sorted((base / "gold").glob("*.json")):
+        doc = json.loads(g.read_text(encoding="utf-8"))
+        note = (base / "notes" / f"{doc['note_id']}.txt").read_text(encoding="utf-8")
+        labels = "".join(
+            f"<tr><td>{html.escape(m['text'])}</td><td>{m['type']}</td><td>{'negated' if m.get('negated') else ''}"
+            f"{' family' if m.get('subject', 'patient') != 'patient' else ''}</td></tr>" for m in doc["mentions"]) \
+            or "<tr><td colspan=3><i>no labels</i></td></tr>"
+        rows.append(f"<section><h2>{doc['note_id']} <small>{html.escape(str(g.relative_to(EVAL_DIR.parent)))}</small></h2>"
+                    f"<div class=g><pre>{html.escape(note)}</pre><table><tr><th>Label</th><th>Type</th><th></th></tr>{labels}"
+                    f"</table></div></section>")
+    out = EVAL_DIR / f"review-{set_name}.html"
+    out.write_text(f"""<!doctype html><meta charset=utf-8><title>Label review: {set_name}</title><style>
+body{{font:14px system-ui;margin:24px;max-width:1200px}} .g{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
+pre{{white-space:pre-wrap;background:#f6f6f2;padding:12px;border-radius:8px}} td,th{{padding:3px 8px;border-bottom:1px solid #ddd;text-align:left}}
+section{{border-top:2px solid #18280E;padding-top:8px;margin-top:24px}} small{{color:#666;font-weight:normal}}</style>
+<h1>Label review: {set_name} ({len(rows)} notes)</h1>
+<p>Check each note against <code>eval/GUIDELINE.md</code>. To change a label, edit the JSON file named under the note.
+When every note is checked, run <code>py -3.12 -m app.cli eval-mark-reviewed --set {set_name} --by "Your Name"</code>.</p>
+{''.join(rows)}""", encoding="utf-8")
+    print(f"written {out}")
+
+
+def eval_mark_reviewed(set_name: str, by: str):
+    base = EVAL_DIR if set_name == "synthea40" else EVAL_DIR / set_name
+    files = sorted((base / "gold").glob("*.json"))
+    for g in files:
+        doc = json.loads(g.read_text(encoding="utf-8"))
+        doc["reviewed_by"] = by
+        g.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    print(f"{len(files)} gold files marked reviewed by {by!r}; re-run eval-extraction --set {set_name} to publish it")
 
 
 def embed_notes(db, limit=None):
@@ -257,13 +320,30 @@ def main(argv=None):
     p = sub.add_parser("eval-sample", help="write the labelled set's note texts to eval/notes (reads the database only)")
     p.add_argument("--count", type=int, default=40); p.add_argument("--seed", type=int, default=101)
     p.add_argument("--resample", action="store_true", help="choose new notes (replaces eval/sample.json)")
-    sub.add_parser("eval-extraction", help="score the note pipeline against eval/gold, write eval/results")
+    p = sub.add_parser("eval-extraction", help="score the note pipeline against a labelled set, write eval/results")
+    p.add_argument("--set", dest="set_name", default="synthea40", choices=["synthea40", "negation"])
+    p.add_argument("--vocab", choices=["core", "extended"], help="default: EXTRACTION_VOCAB")
     p = sub.add_parser("eval-search-db", help="local Postgres copy of the Synthea notes for eval-search")
     p.add_argument("--from", dest="source", type=Path, default=Path(__file__).resolve().parents[1] / "clinicalbrief_dev.db")
     sub.add_parser("eval-search", help="keyword vs semantic vs hybrid note search on eval/search/questions.jsonl")
+    sub.add_parser("eval-linking", help="record-linking coverage on the labelled set (needs the notes' patients)")
     p = sub.add_parser("embed-notes", help="store local embeddings for notes that have none (migration 0014)")
     p.add_argument("--limit", type=int, help="at most this many notes")
+    p = sub.add_parser("build-vocab", help="extraction vocabulary from ICD-10-CM and RxNorm downloads (see DEPLOY/README)")
+    p.add_argument("--from", dest="source", type=Path,
+                   default=Path(__file__).resolve().parents[2] / "data" / "raw" / "terminology")
+    p = sub.add_parser("eval-review", help="side-by-side page of notes and labels for the author's review")
+    p.add_argument("--set", dest="set_name", default="synthea40", choices=["synthea40", "negation"])
+    p = sub.add_parser("eval-mark-reviewed", help="record who reviewed a labelled set")
+    p.add_argument("--set", dest="set_name", default="synthea40", choices=["synthea40", "negation"])
+    p.add_argument("--by", required=True)
     args = parser.parse_args(argv)
+    if args.cmd == "eval-review":
+        return eval_review(args.set_name)            # files only
+    if args.cmd == "eval-mark-reviewed":
+        return eval_mark_reviewed(args.set_name, args.by)
+    if args.cmd == "build-vocab":
+        return build_vocab(args.source)  # files only, no database
     if args.cmd == "eval-search-db":
         return eval_search_db(args.source)  # works on its own throwaway database, not DATABASE_URL
     if (args.cmd in ("import", "process-notes", "set-role", "ask", "embed-notes") and not getattr(args, "dry_run", False)) or             (args.cmd == "flag-demo" and args.apply):
@@ -323,9 +403,14 @@ def main(argv=None):
         elif args.cmd == "eval-sample":
             eval_sample(db, args.count, args.seed, args.resample)
         elif args.cmd == "eval-extraction":
-            eval_extraction()
+            eval_extraction(args.set_name, args.vocab)
         elif args.cmd == "eval-search":
             eval_search(db)
+        elif args.cmd == "eval-linking":
+            from app.services.evaluation import linking_coverage
+            r = linking_coverage(db, EVAL_DIR)
+            print(json.dumps(r, indent=1))
+            (EVAL_DIR / "results" / "linking-synthea40.json").write_text(json.dumps(r, indent=1), encoding="utf-8")
         elif args.cmd == "embed-notes":
             embed_notes(db, args.limit)
         elif args.cmd == "set-role":

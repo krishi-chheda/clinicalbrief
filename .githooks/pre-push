@@ -27,4 +27,6 @@ echo "[pre-push] $summary"
 echo "[pre-push] frontend type check"
 cd "$root/clinicalbrief-frontend" || exit 1
 npx tsc --noEmit || { echo "[pre-push] BLOCKED: TypeScript errors"; exit 1; }
+echo "[pre-push] frontend unit tests (F-02: what the service worker may store)"
+out=$(npm test --silent 2>&1) || { printf '%s\n' "$out" | tail -30; echo "[pre-push] BLOCKED: frontend unit tests failed (npm test)"; exit 1; }
 echo "[pre-push] OK"

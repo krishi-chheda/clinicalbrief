@@ -1,0 +1,29 @@
+{
+ "notes": 40,
+ "targets": 352,
+ "linked": 319,
+ "coverage": 0.90625,
+ "links_not_labelled": 0,
+ "by_type": {
+  "Disease": {
+   "targets": 123,
+   "linked": 123,
+   "coverage": 1.0
+  },
+  "Medication": {
+   "targets": 106,
+   "linked": 106,
+   "coverage": 1.0
+  },
+  "Procedure": {
+   "targets": 94,
+   "linked": 90,
+   "coverage": 0.9574468085106383
+  },
+  "Symptom": {
+   "targets": 29,
+   "linked": 0,
+   "coverage": 0.0
+  }
+ }
+}

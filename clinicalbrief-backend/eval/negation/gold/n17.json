@@ -1,0 +1,19 @@
+{
+ "note_id": "n17",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "atrial fibrillation",
+   "type": "Disease",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "electrocardiogram",
+   "type": "Procedure",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

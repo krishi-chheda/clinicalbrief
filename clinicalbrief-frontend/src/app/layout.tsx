@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ClinicalBriefApp from "./ClinicalBriefApp";
+import { PwaProvider } from "@/components/pwa/PwaProvider";
 
 export const metadata: Metadata = {
   title: "ClinicalBrief · The reviewed record for clinical notes",
   description: "Research prototype on synthetic data: clinical notes turned into a reviewed, searchable and FHIR-exportable record. Not a medical device.",
+  appleWebApp: { capable: true, title: "ClinicalBrief", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export default function RootLayout({
@@ -17,8 +20,10 @@ export default function RootLayout({
       <body className="antialiased min-h-screen">
         {/* Mounted once here, not in the page: a page remounts whenever its URL segment changes,
             which threw away all loaded data on every Dashboard <-> Patients switch. */}
-        <ClinicalBriefApp />
-        {children}
+        <PwaProvider>
+          <ClinicalBriefApp />
+          {children}
+        </PwaProvider>
       </body>
     </html>
   );

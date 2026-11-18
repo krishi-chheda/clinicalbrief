@@ -16,6 +16,8 @@ import SystemHealth from "../components/SystemHealth";
 import RecordSearch from "../components/RecordSearch";
 import NoteText from "../components/NoteText";
 import Landing from "../components/Landing";
+import { OfflineState, useOnline } from "../components/pwa/OfflineState";
+import { clearPagesCache } from "../lib/pwa/cache-policy";
 import { displayName, ageLabel, sourceLabel, formatDate, formatCount, hasRealRecentDate, SOURCE_LABELS } from "../lib/clinical";
 import {
   Activity,
@@ -76,7 +78,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { DEFAULT_LAYOUTS, knownWidgets, WidgetConfig } from "../lib/layouts";
-import { Patient, Document, PatientRecord, ProcessingStatus, PIPELINE_STAGES, scoreLabel, shortCodeSystem, ICD10Mapping, Entity, Summary, ParsedMedication, ParsedAllergy, DocumentInsights, AuditLog, BACKEND_URL, fetchProfile } from "../lib/clinical";
+import { Patient, Document, PatientRecord, ProcessingStatus, PIPELINE_STAGES, scoreLabel, shortCodeSystem, ICD10Mapping, Entity, Summary, ParsedMedication, ParsedAllergy, DocumentInsights, AuditLog, BACKEND_URL, fetchProfile, RecordLink } from "../lib/clinical";
 import { SortableWidgetProps, SortableWidget, ConfidenceBadge, MetricCard, InsightCard, GROUNDING_STYLE, CopilotMessageView } from "../components/ui";
 import CopilotThinking, { ThinkingStep } from "../components/CopilotThinking";
 import { RecordSummary, RecordTimeline } from "../components/PatientRecordView";
@@ -117,6 +119,18 @@ export default function ClinicalBriefApp() {
   const openPatient = (p: Patient | string) => router.push(patientPath(typeof p === "string" ? p : p.patient_id));
   // Session restore is async: protected pages wait for it instead of flashing the login form.
   const [authReady, setAuthReady] = useState(false);
+  // F-02: a stored session whose profile could not be fetched because the device is offline (not signed out).
+  const [sessionOffline, setSessionOffline] = useState(false);
+  // F-02: this document is the precached /offline page answering a page never opened on this device. Decided in the
+  // first render on both sides (server: the path is /offline; browser: the page's marker), so hydration matches.
+  const [offlineFallback] = useState(() => typeof document === "undefined"
+    ? pathname === "/offline" : !!document.getElementById("cb-offline-fallback"));
+  const online = useOnline();
+  // Every sign-out also deletes the stored page documents (shared clinical workstations). Records are never stored.
+  const signOutAndClear = async () => {
+    await clearPagesCache();
+    await supabase.auth.signOut();
+  };
   // Phones: the sidebar is an off-canvas menu, closed again on every navigation.
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => setNavOpen(false), [pathname]);
@@ -146,6 +160,8 @@ export default function ClinicalBriefApp() {
   const [patientDocumentTotal, setPatientDocumentTotal] = useState(0);  // full count; the list holds the newest 100
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [insights, setInsights] = useState<DocumentInsights | null>(null);
+  // v1.0.1: the patient's own coded record items this note mentions (GET /documents/{id}/record-links).
+  const [recordLinks, setRecordLinks] = useState<RecordLink[] | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Enterprise Features States
@@ -825,6 +841,36 @@ export default function ClinicalBriefApp() {
           <div className="text-xs text-slate-400 italic py-4 text-center">Loading ICD-10 Mapping...</div>
         );
 
+      case "record_links":
+        return recordLinks ? (
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin select-text">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Coded items from this patient&apos;s record that the note mentions by name. Matched from the record, not AI-extracted.
+            </p>
+            {recordLinks.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-2">The note mentions nothing from the coded record.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {recordLinks.map(l => (
+                  <li key={`${l.kind}-${l.name}`} className="py-2 text-xs" title={l.evidence}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] capitalize text-slate-600 dark:text-slate-300">{l.kind}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{l.name}</span>
+                      {l.status && <span className="text-slate-500">{l.status}</span>}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500 font-mono">
+                      {l.code ? `${shortCodeSystem(l.code_system)} ${l.code}`.trim() : "no code"}
+                      {l.date ? ` · ${formatDate(l.date)}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400 italic py-4 text-center">Loading record links...</div>
+        );
+
       case "nlp_entities":
         return insights ? (
           <div className="space-y-4 max-h-[350px] overflow-y-auto scrollbar-thin select-text">
@@ -1092,12 +1138,15 @@ export default function ClinicalBriefApp() {
           setUserRole(profile.role);
           setUserEmail(profile.email);
           setToken(accessToken);
+        } else if (!res && !navigator.onLine) {
+          setSessionOffline(true);
         }
       }
       setAuthReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
+        void clearPagesCache();  // also when another tab signed out
         setToken(null);
         setCurrentView("landing");
       }
@@ -1181,6 +1230,8 @@ export default function ClinicalBriefApp() {
   useEffect(() => {
     if (selectedDocument) {
       loadDocumentInsights(selectedDocument.document_id);
+      setRecordLinks(null);
+      getJson(`/api/v1/documents/${selectedDocument.document_id}/record-links`).then(d => setRecordLinks(d?.links ?? []));
       loadRedactedText(selectedDocument.document_id);
       setExplainEntity(null);
     }
@@ -1198,7 +1249,7 @@ export default function ClinicalBriefApp() {
     const res = await fetch(url, { ...options, headers });
     if (res.status === 401) {
       // Session invalid or expired beyond refresh: sign in again. (403 = signed in but not permitted; callers handle it.)
-      await supabase.auth.signOut();
+      await signOutAndClear();
       setToken(null);
     }
     return res;
@@ -1450,7 +1501,7 @@ export default function ClinicalBriefApp() {
   const finishSignIn = async (accessToken: string, noRoleMessage: string): Promise<string | null> => {
     const res = await fetchProfile(accessToken);
     if (!res?.ok) {
-      await supabase.auth.signOut();
+      await signOutAndClear();
       if (res?.status === 403) return noRoleMessage;
       // The status (or "no response": network, CORS or the API waking up) is what tells these failures apart.
       return `Signed in, but your ClinicalBrief profile could not be loaded (${res ? `HTTP ${res.status}` : "no response from the API"}).`;
@@ -1474,7 +1525,7 @@ export default function ClinicalBriefApp() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOutAndClear();
     setToken(null);
     setSelectedPatient(null);
     setSelectedDocument(null);
@@ -1789,6 +1840,12 @@ export default function ClinicalBriefApp() {
           <div role="status" className="mb-6 px-4 py-2.5 rounded-xl border border-[#B3C5A0] bg-[#F7F9F4] dark:bg-white/5 dark:border-white/15 text-xs text-[#18280E] dark:text-[#DFE6D6]">
             <b className="font-semibold">Research view:</b> direct identifiers removed (names, date of birth, date of death).
             Clinical dates are kept. This is not a validated de-identification.
+          </div>
+        )}
+        {!online && (
+          <div role="status" className="mb-6 px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-400/10 dark:border-amber-400/30 text-xs text-amber-900 dark:text-amber-100">
+            <b className="font-semibold">You&apos;re offline: records need a connection.</b> No records are stored on this device, so
+            new records and changes can&apos;t load or save until you reconnect. What is on screen stays as it is.
           </div>
         )}
         {isDemo && (
@@ -2888,12 +2945,14 @@ export default function ClinicalBriefApp() {
   );
 
   // Router dispatcher
+  if (offlineFallback) return <OfflineState fallback />;
   if (currentView === "landing") return <Landing onSignIn={() => setCurrentView("login")} onTryDemo={DEMO_ENABLED ? handleTryDemo : undefined} />;
   if (INFO_VIEWS.includes(currentView)) return <InfoPage view={currentView} />;
   if (currentView === "login") return renderLogin();
   if (!authReady) {
     return <LoadingScreen />;
   }
+  if (!token && sessionOffline) return <OfflineState />;  // signed in, but offline at launch: nothing to show
   if (!token) return renderLogin();  // stays on the requested URL; continues there after sign-in
 
   const dispatchView = () => {

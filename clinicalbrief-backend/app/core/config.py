@@ -39,6 +39,9 @@ class Settings:
 
     # AI Engine Configuration
     USE_MOCK_MODELS: bool = os.getenv("USE_MOCK_MODELS", "true").lower() == "true"
+    # Rule-based extraction vocabulary: "core" (~60 hand-picked terms) or "extended" (+ ICD-10-CM and RxNorm,
+    # app/data/terminology.tsv). See eval/results for how each scores.
+    EXTRACTION_VOCAB: str = os.getenv("EXTRACTION_VOCAB", "extended")  # adopted in v1.0.1 (README: Evaluation)
 
     # Models Name
     NER_MODEL: str = "d4data/biomedical-ner-all"

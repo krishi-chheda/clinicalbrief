@@ -1,5 +1,6 @@
 // S-1 (security audit 2026-10-19): browser security headers for every page, and no X-Powered-By.
 // The content security policy is per request (it carries a nonce), so it is set in src/proxy.ts (src/lib/csp.ts).
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -19,8 +20,11 @@ const nextConfig: NextConfig = {
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
       ],
-    }];
+    },
+    // F-02: the service worker must never be served stale, or a new deploy is never seen.
+    { source: "/serwist/:path*", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }];
   },
 };
 
-export default nextConfig;
+// withSerwist keeps esbuild (used to bundle the service worker, src/app/serwist/[path]/route.ts) out of the server bundle.
+export default withSerwist(nextConfig);

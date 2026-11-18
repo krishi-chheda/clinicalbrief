@@ -79,8 +79,9 @@ def is_family_history(sentence: str, start: int) -> bool:
 
 
 class AIPipelineOrchestrator:
-    def __init__(self):
+    def __init__(self, vocab: Optional[str] = None):
         self.use_mock = settings.USE_MOCK_MODELS
+        self.vocab = vocab or settings.EXTRACTION_VOCAB  # "core" or "extended" (ICD-10-CM + RxNorm terms)
         self.ner_pipeline = None
         self.summary_pipeline = None
 
@@ -167,6 +168,22 @@ class AIPipelineOrchestrator:
 
     def _extract_rule_based(self, text: str) -> List[Dict[str, Any]]:
         found: Dict[tuple, Dict[str, Any]] = {}
+
+        def add(sentence, start, end, etype, source):
+            if is_negated(sentence, start, end) or is_family_history(sentence, start):
+                return
+            if etype == "Medication" and _ALLERGY_CONTEXT.search(sentence[:start]):
+                etype = "Allergy"  # "allergic to penicillin" is an allergy, not a prescription
+            text_ = sentence[start:end]
+            found.setdefault((text_.lower(), etype), {
+                "entity_text": text_,
+                "entity_type": etype,
+                "confidence": None,  # dictionary matching has no calibrated score
+                "evidence": sentence,
+                "reasoning": f"Rule-based: whole-word match for '{text_.lower()}' ({source}), not negated or about a relative in its sentence.",
+                "review_status": "pending",
+            })
+
         for _, sentence in split_sentences(text):
             taken: List[tuple[int, int]] = []  # spans already claimed by a longer term
             for etype, term, pattern in self._patterns:
@@ -174,20 +191,13 @@ class AIPipelineOrchestrator:
                     if any(m.start() < e and s < m.end() for s, e in taken):
                         continue
                     taken.append((m.start(), m.end()))
-                    if is_negated(sentence, m.start(), m.end()) or is_family_history(sentence, m.start()):
-                        continue
-                    entity_type = etype
-                    if etype == "Medication" and _ALLERGY_CONTEXT.search(sentence[:m.start()]):
-                        entity_type = "Allergy"  # "allergic to penicillin" is an allergy, not a prescription
-                    key = (m.group(0).lower(), entity_type)
-                    found.setdefault(key, {
-                        "entity_text": m.group(0),
-                        "entity_type": entity_type,
-                        "confidence": None,  # dictionary matching has no calibrated score
-                        "evidence": sentence,
-                        "reasoning": f"Rule-based: whole-word dictionary match for '{term}', not negated or about a relative in its sentence.",
-                        "review_status": "pending",
-                    })
+                    add(sentence, m.start(), m.end(), etype, "core dictionary")
+            if self.vocab == "extended":
+                from app.services.terminology import index
+                for start, end, _term, etype, _code, source, _desc in index().find(sentence):
+                    if not any(start < e and s < end for s, e in taken):
+                        taken.append((start, end))
+                        add(sentence, start, end, etype, "ICD-10-CM" if source == "icd10cm" else "RxNorm")
         return list(found.values())
 
     _NER_TYPES = {"Disease_disorder": "Disease", "Sign_symptom": "Symptom", "Medication": "Medication",
@@ -240,6 +250,12 @@ class AIPipelineOrchestrator:
         if entity_type != "Disease":
             return None
         hit = self.icd10_dictionary.get(entity_text.lower().strip())
+        if not hit and self.vocab == "extended":  # the ICD-10-CM code the term came from
+            from app.services.terminology import index
+            entry = index().terms.get(" ".join(entity_text.lower().split()))
+            if entry and entry[2] == "icd10cm" and entry[1]:
+                code = entry[1] if len(entry[1]) <= 3 else f"{entry[1][:3]}.{entry[1][3:]}"
+                hit = (code, entry[3])
         if not hit:
             return None
         return {"icd10_code": hit[0], "code_description": hit[1], "confidence": None}

@@ -31,6 +31,10 @@ labelled so that outputting them counts as a negation / family-history error.
 | Procedure | Each `(procedure)` and named procedure in prose, including screenings and assessments | depression screening, medication reconciliation |
 | Allergy | Each substance the patient is allergic to | penicillin, peanut |
 
+Uncertain or hypothetical mentions ("rule out pneumonia", "return if fever develops", "hypertension suspected") are
+not affirmed findings: they are labelled `negated: true`. (Added 2026-11-13 for the negation set; no Synthea note in
+the first set contains such a mention, so its labels are unchanged.)
+
 Past history counts: "Patient has a history of asthma" is an affirmed patient mention of asthma.
 
 ## Excluded (not labelled)

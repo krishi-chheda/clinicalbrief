@@ -14,6 +14,12 @@ export interface Patient {
   deidentified?: boolean;         // researchers: the name is a pseudonym ("Patient 3F9A12BC")
 }
 
+// v1.0.1: GET /documents/{id}/record-links
+export interface RecordLink {
+  kind: "condition" | "medication" | "procedure" | "allergy";
+  name: string; code: string | null; code_system: string | null; date: string | null; status: string | null; evidence: string;
+}
+
 export const SOURCE_LABELS: Record<string, string> = {
   synthea: "Synthea (synthetic)",
   clinicalbrief: "Entered in ClinicalBrief",

@@ -1,0 +1,31 @@
+{
+ "note_id": "n09",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "fever",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "chills",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "night sweats",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "weight loss",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

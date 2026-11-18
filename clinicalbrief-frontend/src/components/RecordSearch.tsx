@@ -159,7 +159,7 @@ export default function RecordSearch({ api, patients, onOpenPatient, onOpenNote 
               {result.expanded && <span> (related terms suggested by the local model)</span>}
             </p>
             {result.note && <p>{result.note}</p>}
-            {result.meaning && <p>Notes ranked by meaning as well as words: notes marked &ldquo;by meaning&rdquo; share no words with your search.</p>}
+            {result.meaning && <p>Notes ranked by meaning as well as words: notes marked &ldquo;by meaning&rdquo; were found by the meaning match, not among the top keyword results.</p>}
             {result.meaning_note && <p>{result.meaning_note}</p>}
             {!result.notes_included && <p>Note text is not searchable for your role (notes are not de-identified).</p>}
           </div>

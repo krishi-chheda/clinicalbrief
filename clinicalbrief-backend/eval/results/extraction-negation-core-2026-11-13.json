@@ -1,0 +1,319 @@
+{
+ "notes": 25,
+ "gold_mentions": 65,
+ "targets": 38,
+ "labelled_by": [
+  "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history"
+ ],
+ "reviewed_by": [
+  "None"
+ ],
+ "pipeline": "rule-based, core vocabulary",
+ "strict": {
+  "mode": "strict",
+  "notes": 25,
+  "overall": {
+   "tp": 24,
+   "fp": 3,
+   "fn": 14,
+   "precision": 0.8888888888888888,
+   "recall": 0.631578947368421,
+   "f1": 0.7384615384615385,
+   "precision_ci95": [
+    0.7647058823529411,
+    1.0
+   ],
+   "recall_ci95": [
+    0.4411764705882353,
+    0.8055555555555556
+   ],
+   "f1_ci95": [
+    0.5769230769230769,
+    0.8571428571428571
+   ]
+  },
+  "by_type": {
+   "Allergy": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     1.0,
+     1.0
+    ]
+   },
+   "Disease": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 4,
+    "precision": 0.875,
+    "recall": 0.6363636363636364,
+    "f1": 0.7368421052631579,
+    "precision_ci95": [
+     0.5714285714285714,
+     1.0
+    ],
+    "recall_ci95": [
+     0.3333333333333333,
+     0.9090909090909091
+    ]
+   },
+   "Medication": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 2,
+    "precision": 0.8571428571428571,
+    "recall": 0.75,
+    "f1": 0.7999999999999999,
+    "precision_ci95": [
+     0.6666666666666666,
+     1.0
+    ],
+    "recall_ci95": [
+     0.4,
+     1.0
+    ]
+   },
+   "Procedure": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 4,
+    "precision": 1.0,
+    "recall": 0.2,
+    "f1": 0.33333333333333337,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.6666666666666666
+    ]
+   },
+   "Symptom": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 4,
+    "precision": 0.875,
+    "recall": 0.6363636363636364,
+    "f1": 0.7368421052631579,
+    "precision_ci95": [
+     0.5,
+     1.0
+    ],
+    "recall_ci95": [
+     0.2857142857142857,
+     0.9166666666666666
+    ]
+   }
+  },
+  "negation_errors": 3,
+  "subject_errors": 0
+ },
+ "lenient": {
+  "mode": "lenient",
+  "notes": 25,
+  "overall": {
+   "tp": 24,
+   "fp": 3,
+   "fn": 14,
+   "precision": 0.8888888888888888,
+   "recall": 0.631578947368421,
+   "f1": 0.7384615384615385,
+   "precision_ci95": [
+    0.7647058823529411,
+    1.0
+   ],
+   "recall_ci95": [
+    0.4411764705882353,
+    0.8055555555555556
+   ],
+   "f1_ci95": [
+    0.5769230769230769,
+    0.8571428571428571
+   ]
+  },
+  "by_type": {
+   "Allergy": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     1.0,
+     1.0
+    ]
+   },
+   "Disease": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 4,
+    "precision": 0.875,
+    "recall": 0.6363636363636364,
+    "f1": 0.7368421052631579,
+    "precision_ci95": [
+     0.5714285714285714,
+     1.0
+    ],
+    "recall_ci95": [
+     0.3333333333333333,
+     0.9090909090909091
+    ]
+   },
+   "Medication": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 2,
+    "precision": 0.8571428571428571,
+    "recall": 0.75,
+    "f1": 0.7999999999999999,
+    "precision_ci95": [
+     0.6666666666666666,
+     1.0
+    ],
+    "recall_ci95": [
+     0.4,
+     1.0
+    ]
+   },
+   "Procedure": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 4,
+    "precision": 1.0,
+    "recall": 0.2,
+    "f1": 0.33333333333333337,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.6666666666666666
+    ]
+   },
+   "Symptom": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 4,
+    "precision": 0.875,
+    "recall": 0.6363636363636364,
+    "f1": 0.7368421052631579,
+    "precision_ci95": [
+     0.5,
+     1.0
+    ],
+    "recall_ci95": [
+     0.2857142857142857,
+     0.9166666666666666
+    ]
+   }
+  },
+  "negation_errors": 3,
+  "subject_errors": 0
+ },
+ "errors": {
+  "missed": [
+   {
+    "text": "rash",
+    "type": "Symptom",
+    "notes": 1
+   },
+   {
+    "text": "azithromycin",
+    "type": "Medication",
+    "notes": 1
+   },
+   {
+    "text": "ct angiogram",
+    "type": "Procedure",
+    "notes": 1
+   },
+   {
+    "text": "weight loss",
+    "type": "Symptom",
+    "notes": 1
+   },
+   {
+    "text": "diarrhea",
+    "type": "Symptom",
+    "notes": 1
+   },
+   {
+    "text": "sore throat",
+    "type": "Symptom",
+    "notes": 1
+   },
+   {
+    "text": "colonoscopy",
+    "type": "Procedure",
+    "notes": 1
+   },
+   {
+    "text": "electrocardiogram",
+    "type": "Procedure",
+    "notes": 1
+   },
+   {
+    "text": "seasonal allergic rhinitis",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "otitis media",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "urinary tract infection",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "nitrofurantoin",
+    "type": "Medication",
+    "notes": 1
+   },
+   {
+    "text": "urine culture",
+    "type": "Procedure",
+    "notes": 1
+   },
+   {
+    "text": "acute bronchitis",
+    "type": "Disease",
+    "notes": 1
+   }
+  ],
+  "false_positives": [
+   {
+    "text": "insulin",
+    "type": "Medication",
+    "notes": 1
+   },
+   {
+    "text": "fever",
+    "type": "Symptom",
+    "notes": 1
+   },
+   {
+    "text": "hypertension",
+    "type": "Disease",
+    "notes": 1
+   }
+  ]
+ }
+}

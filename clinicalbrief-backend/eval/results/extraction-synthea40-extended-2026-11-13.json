@@ -8,50 +8,50 @@
  "reviewed_by": [
   "None"
  ],
- "pipeline": "rule-based (USE_MOCK_MODELS=true)",
+ "pipeline": "rule-based, extended vocabulary",
  "strict": {
   "mode": "strict",
   "notes": 40,
   "overall": {
-   "tp": 7,
-   "fp": 18,
-   "fn": 345,
-   "precision": 0.28,
-   "recall": 0.019886363636363636,
-   "f1": 0.03713527851458886,
+   "tp": 32,
+   "fp": 166,
+   "fn": 320,
+   "precision": 0.16161616161616163,
+   "recall": 0.09090909090909091,
+   "f1": 0.11636363636363636,
    "precision_ci95": [
-    0.07692307692307693,
-    0.48484848484848486
+    0.11650485436893204,
+    0.2138728323699422
    ],
    "recall_ci95": [
-    0.005405405405405406,
-    0.03663003663003663
+    0.06748466257668712,
+    0.11846689895470383
    ],
    "f1_ci95": [
-    0.010075566750629724,
-    0.06666666666666667
+    0.08598130841121494,
+    0.1514476614699332
    ]
   },
   "by_type": {
    "Disease": {
-    "tp": 0,
-    "fp": 3,
-    "fn": 123,
-    "precision": 0.0,
-    "recall": 0.0,
-    "f1": 0.0,
+    "tp": 23,
+    "fp": 34,
+    "fn": 100,
+    "precision": 0.40350877192982454,
+    "recall": 0.18699186991869918,
+    "f1": 0.2555555555555556,
     "precision_ci95": [
-     0.0,
-     0.0
+     0.2878787878787879,
+     0.543859649122807
     ],
     "recall_ci95": [
-     0.0,
-     0.0
+     0.13013698630136986,
+     0.25892857142857145
     ]
    },
    "Medication": {
     "tp": 0,
-    "fp": 14,
+    "fp": 129,
     "fn": 106,
     "precision": 0.0,
     "recall": 0.0,
@@ -82,19 +82,19 @@
     ]
    },
    "Symptom": {
-    "tp": 7,
-    "fp": 0,
-    "fn": 22,
-    "precision": 1.0,
-    "recall": 0.2413793103448276,
-    "f1": 0.3888888888888889,
+    "tp": 9,
+    "fp": 2,
+    "fn": 20,
+    "precision": 0.8181818181818182,
+    "recall": 0.3103448275862069,
+    "f1": 0.45000000000000007,
     "precision_ci95": [
-     1.0,
+     0.5714285714285714,
      1.0
     ],
     "recall_ci95": [
-     0.125,
-     0.32
+     0.2222222222222222,
+     0.4166666666666667
     ]
    }
   },
@@ -105,56 +105,56 @@
   "mode": "lenient",
   "notes": 40,
   "overall": {
-   "tp": 24,
-   "fp": 1,
-   "fn": 328,
-   "precision": 0.96,
-   "recall": 0.06818181818181818,
-   "f1": 0.1273209549071618,
+   "tp": 149,
+   "fp": 21,
+   "fn": 203,
+   "precision": 0.8764705882352941,
+   "recall": 0.42329545454545453,
+   "f1": 0.5708812260536398,
    "precision_ci95": [
-    0.8823529411764706,
-    1.0
+    0.8074534161490683,
+    0.9375
    ],
    "recall_ci95": [
-    0.043227665706051875,
-    0.09350649350649351
+    0.3644859813084112,
+    0.48201438848920863
    ],
    "f1_ci95": [
-    0.08280254777070063,
-    0.17061611374407581
+    0.5040128410914928,
+    0.6329113924050632
    ]
   },
   "by_type": {
    "Disease": {
-    "tp": 2,
-    "fp": 1,
-    "fn": 121,
-    "precision": 0.6666666666666666,
-    "recall": 0.016260162601626018,
-    "f1": 0.03174603174603175,
+    "tp": 36,
+    "fp": 21,
+    "fn": 87,
+    "precision": 0.631578947368421,
+    "recall": 0.2926829268292683,
+    "f1": 0.39999999999999997,
     "precision_ci95": [
-     0.5,
-     1.0
+     0.4915254237288136,
+     0.782608695652174
     ],
     "recall_ci95": [
-     0.0,
-     0.046296296296296294
+     0.2323943661971831,
+     0.36470588235294116
     ]
    },
    "Medication": {
-    "tp": 14,
+    "tp": 101,
     "fp": 0,
-    "fn": 92,
+    "fn": 5,
     "precision": 1.0,
-    "recall": 0.1320754716981132,
-    "f1": 0.23333333333333334,
+    "recall": 0.9528301886792453,
+    "f1": 0.9758454106280194,
     "precision_ci95": [
      1.0,
      1.0
     ],
     "recall_ci95": [
-     0.07407407407407407,
-     0.19791666666666666
+     0.9104477611940298,
+     1.0
     ]
    },
    "Procedure": {
@@ -174,19 +174,19 @@
     ]
    },
    "Symptom": {
-    "tp": 7,
+    "tp": 11,
     "fp": 0,
-    "fn": 22,
+    "fn": 18,
     "precision": 1.0,
-    "recall": 0.2413793103448276,
-    "f1": 0.3888888888888889,
+    "recall": 0.3793103448275862,
+    "f1": 0.5499999999999999,
     "precision_ci95": [
      1.0,
      1.0
     ],
     "recall_ci95": [
-     0.125,
-     0.32
+     0.275,
+     0.5555555555555556
     ]
    }
   },
@@ -196,7 +196,7 @@
  "errors": {
   "missed": [
    {
-    "text": "sodium fluoride 0.0272 mg/mg oral gel",
+    "text": "sodium fluoride 0.0272 mg mg oral gel",
     "type": "Medication",
     "notes": 17
    },
@@ -226,29 +226,19 @@
     "notes": 8
    },
    {
-    "text": "assessment of health and social care needs",
-    "type": "Procedure",
-    "notes": 8
-   },
-   {
     "text": "acetaminophen 325 mg oral tablet",
     "type": "Medication",
     "notes": 8
    },
    {
-    "text": "acute bronchitis",
-    "type": "Disease",
-    "notes": 7
+    "text": "assessment of health and social care needs",
+    "type": "Procedure",
+    "notes": 8
    },
    {
     "text": "patient referral for dental care",
     "type": "Procedure",
     "notes": 7
-   },
-   {
-    "text": "otitis media",
-    "type": "Disease",
-    "notes": 6
    },
    {
     "text": "normal pregnancy",
@@ -266,16 +256,76 @@
     "notes": 6
    },
    {
-    "text": "assessment using alcohol use disorders identification test - consumption",
+    "text": "assessment using alcohol use disorders identification test consumption",
     "type": "Procedure",
     "notes": 5
+   },
+   {
+    "text": "ibuprofen 100 mg oral tablet",
+    "type": "Medication",
+    "notes": 5
+   },
+   {
+    "text": "dental filling lost",
+    "type": "Disease",
+    "notes": 4
    }
   ],
   "false_positives": [
    {
+    "text": "sodium fluoride",
+    "type": "Medication",
+    "notes": 17
+   },
+   {
+    "text": "acetaminophen",
+    "type": "Medication",
+    "notes": 15
+   },
+   {
+    "text": "ibuprofen",
+    "type": "Medication",
+    "notes": 9
+   },
+   {
+    "text": "ethinyl estradiol",
+    "type": "Medication",
+    "notes": 6
+   },
+   {
     "text": "amoxicillin",
     "type": "Medication",
     "notes": 5
+   },
+   {
+    "text": "alcohol use",
+    "type": "Disease",
+    "notes": 5
+   },
+   {
+    "text": "dental caries",
+    "type": "Disease",
+    "notes": 5
+   },
+   {
+    "text": "levonorgestrel",
+    "type": "Medication",
+    "notes": 5
+   },
+   {
+    "text": "inert ingredients",
+    "type": "Medication",
+    "notes": 4
+   },
+   {
+    "text": "depression",
+    "type": "Disease",
+    "notes": 4
+   },
+   {
+    "text": "cystitis",
+    "type": "Disease",
+    "notes": 3
    },
    {
     "text": "penicillin",
@@ -283,44 +333,19 @@
     "notes": 3
    },
    {
-    "text": "insulin",
+    "text": "potassium",
     "type": "Medication",
     "notes": 3
    },
    {
-    "text": "lisinopril",
+    "text": "norethindrone",
     "type": "Medication",
-    "notes": 1
+    "notes": 3
    },
    {
-    "text": "dialysis",
-    "type": "Procedure",
-    "notes": 1
-   },
-   {
-    "text": "metformin",
+    "text": "insulin",
     "type": "Medication",
-    "notes": 1
-   },
-   {
-    "text": "myocardial infarction",
-    "type": "Disease",
-    "notes": 1
-   },
-   {
-    "text": "diabetes",
-    "type": "Disease",
-    "notes": 1
-   },
-   {
-    "text": "albuterol",
-    "type": "Medication",
-    "notes": 1
-   },
-   {
-    "text": "asthma",
-    "type": "Disease",
-    "notes": 1
+    "notes": 3
    }
   ]
  }

@@ -1,0 +1,25 @@
+{
+ "note_id": "n01",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "chest pain",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "shortness of breath",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  },
+  {
+   "text": "cough",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

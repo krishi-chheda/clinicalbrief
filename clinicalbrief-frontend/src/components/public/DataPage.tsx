@@ -109,14 +109,18 @@ const EXAMPLE = [
   ["provenance", "imported"],
 ];
 
-// v1.0.1 Part B: from clinicalbrief-backend/eval/results/extraction-2026-11-10.json (40 notes, 352 labelled mentions).
-// Lenient = same type, one term contains the other ("insulin" ~ "insulin isophane ... [humulin]").
-const EVAL_ROWS: [string, string, string, string][] = [
-  ["All types", "0.96 (0.88-1.00)", "0.07 (0.04-0.09)", "24 of 352"],
-  ["Symptom", "1.00", "0.24 (0.12-0.32)", "7 of 29"],
-  ["Medication", "1.00", "0.13 (0.07-0.20)", "14 of 106"],
-  ["Disease", "0.67 (0.50-1.00)", "0.02 (0.00-0.05)", "2 of 123"],
-  ["Procedure", "1.00", "0.01 (0.00-0.04)", "1 of 94"],
+// v1.0.1: from clinicalbrief-backend/eval/results/extraction-*-2026-11-13.json and linking-synthea40.json.
+// Lenient = same type, one term contains the other ("insulin" ~ "insulin isophane ... [humulin]"); strict = same type and
+// the same words.
+const EVAL_ROWS: [string, string, string][] = [
+  ["Original dictionary (~60 terms), lenient", "0.96 (0.88-1.00)", "0.07 (0.04-0.09)"],
+  ["Extended vocabulary (default), lenient", "0.88 (0.81-0.94)", "0.42 (0.36-0.48)"],
+  ["  Medications", "1.00", "0.95 (0.91-1.00)"],
+  ["  Symptoms", "1.00", "0.38 (0.28-0.56)"],
+  ["  Diseases", "0.63 (0.49-0.78)", "0.29 (0.23-0.36)"],
+  ["  Procedures", "1.00", "0.01 (0.00-0.04)"],
+  ["Original dictionary, strict", "0.28 (0.08-0.48)", "0.02 (0.01-0.04)"],
+  ["Extended vocabulary, strict", "0.16 (0.12-0.21)", "0.09 (0.07-0.12)"],
 ];
 
 export default function DataPage() {
@@ -201,39 +205,59 @@ export default function DataPage() {
         </p>
       </Section>
 
-      <Section id="evaluation" tone="pale" label="Accuracy, measured" title="How much the note pipeline finds">
+      <Section id="evaluation" tone="pale" label="Preliminary scores" title="How much the note pipeline finds">
         <div className="space-y-4 text-[#18280E] leading-relaxed max-w-3xl">
           <p>
-            The rule-based note pipeline was scored against 40 Synthea notes (one per patient, fixed random seed) with every
-            disease, symptom, medication, procedure and allergy labelled by hand, following a written guideline, 352 mentions in all.
+            <b className="font-semibold">Preliminary scores on synthetic notes, against AI-drafted labels not yet reviewed by a
+            person; no clinical accuracy claimed.</b>
           </p>
           <p>
-            <b className="font-semibold">What it finds is almost always right; it finds very little.</b> Its dictionary has about 60 terms, and Synthea
-            writes most conditions, drug products and procedures in words that are not in it (gingivitis, viral sinusitis, sodium fluoride gel,
-            medication reconciliation). Exact-term matching scores lower still (precision 0.28, recall 0.02), because the pipeline reports
-            &ldquo;insulin&rdquo; where the note says the full product name.
+            The rule-based note pipeline was scored against 40 Synthea notes (one per patient, fixed random seed). Every
+            disease, symptom, medication, procedure and allergy in them was labelled by an AI model (Claude) following a written
+            guideline, 352 mentions in all.
+          </p>
+          <p>
+            <b className="font-semibold">The original dictionary was almost always right but found very little.</b> In v1.0.1 the pipeline
+            also matches about 33,700 terms from ICD-10-CM and RxNorm, public terminologies that Synthea does not use, so the test is
+            not rigged in its favour. It now finds six times as much at somewhat lower precision. It was adopted by a rule set
+            before the run (precision at least 0.85), a point reached only after fixing a scoring bug found while reviewing that
+            run, and the interval&apos;s lower end (0.81) is below the bar.
           </p>
         </div>
         <div className="mt-6 overflow-x-auto rounded-xl border border-[#B3C5A0]/70 bg-white max-w-3xl">
           <table className="w-full text-sm text-left">
             <thead className="lp-mono text-[11px] uppercase tracking-wider text-[#4A5B38]">
-              <tr><th className="px-4 py-3">Type (lenient match)</th><th className="px-4 py-3">Precision</th><th className="px-4 py-3">Recall</th><th className="px-4 py-3">Found</th></tr>
+              <tr><th className="px-4 py-3">Vocabulary and match</th><th className="px-4 py-3">Precision</th><th className="px-4 py-3">Recall</th></tr>
             </thead>
             <tbody className="divide-y divide-[#B3C5A0]/50 text-[#090F05]">
-              {EVAL_ROWS.map(([t, p, r, f]) => (
-                <tr key={t} className={t === "All types" ? "font-semibold" : ""}>
-                  <td className="px-4 py-2.5">{t}</td><td className="px-4 py-2.5 whitespace-nowrap">{p}</td>
-                  <td className="px-4 py-2.5 whitespace-nowrap">{r}</td><td className="px-4 py-2.5 whitespace-nowrap">{f}</td>
+              {EVAL_ROWS.map(([t, p, r]) => (
+                <tr key={t} className={t.startsWith("  ") ? "text-[#4A5B38]" : "font-semibold"}>
+                  <td className={`px-4 py-2.5 ${t.startsWith("  ") ? "pl-8" : ""}`}>{t.trim()}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">{p}</td><td className="px-4 py-2.5 whitespace-nowrap">{r}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 max-w-3xl">
+          <div className="rounded-xl border border-[#B3C5A0]/70 bg-white p-5 text-sm text-[#18280E] leading-relaxed">
+            <Mono className="text-[#4A5B38]">Negation set</Mono>
+            <p className="mt-2">25 short notes, written together with their labels by the AI model to exercise negation and family
+              history. Family history right 7 of 7; negated or uncertain findings right 18 of 21. Missed: &ldquo;insulin not
+              required&rdquo;, &ldquo;return if fever develops&rdquo;, &ldquo;hypertension suspected&rdquo;. This shows the rules on
+              examples written to test them, not how they do on notes in general.</p>
+          </div>
+          <div className="rounded-xl border border-[#B3C5A0]/70 bg-white p-5 text-sm text-[#18280E] leading-relaxed">
+            <Mono className="text-[#4A5B38]">Record linking</Mono>
+            <p className="mt-2">Matching a note against the patient&apos;s own coded record finds 91% of labelled mentions. That is
+              coverage, not accuracy: Synthea writes its notes from that same record, so it is circular here.</p>
+          </div>
+        </div>
         <ul className="mt-6 space-y-2 text-sm text-[#4A5B38] leading-relaxed max-w-3xl list-disc pl-5">
-          <li>Brackets are 95% bootstrap intervals over notes. No allergies were mentioned in the sample, so allergies are not measured.</li>
-          <li>The one wrong finding: &ldquo;diabetes&rdquo; reported as a disease from the procedure &ldquo;urine screening test for diabetes&rdquo;.</li>
-          <li>Negation and family-history handling are <b className="font-semibold">not</b> measured: these notes contain no negated or family mentions in scope.</li>
-          <li>Labels were drafted by an AI model (Claude) from the note text and the guideline, and have not yet been reviewed by a person.</li>
+          <li>Lenient: same type, and one term contains the other (&ldquo;insulin&rdquo; matches &ldquo;insulin isophane&nbsp;&hellip;&rdquo;). Strict: same type and the same words, so most medication matches fail on dose and form.</li>
+          <li>Brackets are 95% bootstrap intervals over notes. No allergies were mentioned in the Synthea sample.</li>
+          <li>Typical mistakes: a term inside a procedure or test name (&ldquo;depression&rdquo; in &ldquo;depression screening&rdquo;) and a few generic words (&ldquo;blood&rdquo;).</li>
+          <li>All labels, and the negation notes, were written by an AI model (Claude) and have not yet been reviewed by a person.</li>
           <li>Synthea notes are templated, so this says nothing about real clinical text. Reproduce with <Mono className="normal-case tracking-normal text-[12px]">py -3.12 -m app.cli eval-extraction</Mono>.</li>
         </ul>
       </Section>
@@ -258,6 +282,28 @@ export default function DataPage() {
               300 patients imported to stay within the free database tier.
             </p>
             <p className="mt-3 text-sm"><a href="https://synthea.mitre.org/downloads" {...EXT} className={A}>synthea.mitre.org/downloads</a></p>
+          </article>
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <article data-licence className="rounded-xl bg-white/5 border border-white/10 p-6 min-w-0">
+            <Eyebrow icon={Scale} dark>ICD-10-CM · public domain</Eyebrow>
+            <h3 className="mt-4 text-xl font-medium">Disease and symptom terms</h3>
+            <p className="mt-2 text-sm text-[#B3C5A0] leading-relaxed">
+              The ICD-10-CM code descriptions published by the US Centers for Medicare &amp; Medicaid Services (CMS), used for the
+              extended extraction vocabulary and ICD-10 suggestions.
+            </p>
+            <p className="mt-3 text-sm"><a href="https://www.cms.gov/medicare/coding-billing/icd-10-codes" {...EXT} className={A}>cms.gov/medicare/coding-billing/icd-10-codes</a></p>
+          </article>
+          <article data-licence className="rounded-xl bg-white/5 border border-white/10 p-6 min-w-0">
+            <Eyebrow icon={Scale} dark>RxNorm · public domain</Eyebrow>
+            <h3 className="mt-4 text-xl font-medium">Medication ingredient names</h3>
+            <p className="mt-2 text-sm text-[#B3C5A0] leading-relaxed">
+              This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM), National
+              Institutes of Health, Department of Health and Human Services; NLM is not responsible for the product and does not
+              endorse or recommend this or any other product. Only RxNorm&apos;s own ingredient names (from RxNav) are used, and the
+              copy here may not reflect the most current RxNorm data.
+            </p>
+            <p className="mt-3 text-sm"><a href="https://www.nlm.nih.gov/research/umls/rxnorm/" {...EXT} className={A}>nlm.nih.gov/research/umls/rxnorm</a></p>
           </article>
         </div>
         <blockquote data-licence className="mt-6 rounded-xl border-l-4 border-[#B2EB76] bg-white/5 p-5 md:p-6 text-sm leading-relaxed">

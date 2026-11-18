@@ -1,0 +1,25 @@
+{
+ "note_id": "n08",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "headache",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "nausea",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "vomiting",
+   "type": "Symptom",
+   "negated": true,
+   "subject": "patient"
+  }
+ ]
+}

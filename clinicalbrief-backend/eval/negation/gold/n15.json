@@ -1,0 +1,19 @@
+{
+ "note_id": "n15",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "dizziness",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "edema",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

@@ -1,0 +1,327 @@
+{
+ "notes": 40,
+ "gold_mentions": 352,
+ "targets": 352,
+ "labelled_by": [
+  "ai-draft (Claude Opus 5.5, from the note text and eval/GUIDELINE.md)"
+ ],
+ "reviewed_by": [
+  "None"
+ ],
+ "pipeline": "rule-based, core vocabulary",
+ "strict": {
+  "mode": "strict",
+  "notes": 40,
+  "overall": {
+   "tp": 7,
+   "fp": 18,
+   "fn": 345,
+   "precision": 0.28,
+   "recall": 0.019886363636363636,
+   "f1": 0.03713527851458886,
+   "precision_ci95": [
+    0.07692307692307693,
+    0.48484848484848486
+   ],
+   "recall_ci95": [
+    0.005405405405405406,
+    0.03663003663003663
+   ],
+   "f1_ci95": [
+    0.010075566750629724,
+    0.06666666666666667
+   ]
+  },
+  "by_type": {
+   "Disease": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 123,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "precision_ci95": [
+     0.0,
+     0.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.0
+    ]
+   },
+   "Medication": {
+    "tp": 0,
+    "fp": 14,
+    "fn": 106,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "precision_ci95": [
+     0.0,
+     0.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.0
+    ]
+   },
+   "Procedure": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 94,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "precision_ci95": [
+     0.0,
+     0.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.0
+    ]
+   },
+   "Symptom": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 22,
+    "precision": 1.0,
+    "recall": 0.2413793103448276,
+    "f1": 0.3888888888888889,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.125,
+     0.32
+    ]
+   }
+  },
+  "negation_errors": 0,
+  "subject_errors": 0
+ },
+ "lenient": {
+  "mode": "lenient",
+  "notes": 40,
+  "overall": {
+   "tp": 24,
+   "fp": 1,
+   "fn": 328,
+   "precision": 0.96,
+   "recall": 0.06818181818181818,
+   "f1": 0.1273209549071618,
+   "precision_ci95": [
+    0.8823529411764706,
+    1.0
+   ],
+   "recall_ci95": [
+    0.043227665706051875,
+    0.09350649350649351
+   ],
+   "f1_ci95": [
+    0.08280254777070063,
+    0.17061611374407581
+   ]
+  },
+  "by_type": {
+   "Disease": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 121,
+    "precision": 0.6666666666666666,
+    "recall": 0.016260162601626018,
+    "f1": 0.03174603174603175,
+    "precision_ci95": [
+     0.5,
+     1.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.046296296296296294
+    ]
+   },
+   "Medication": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 92,
+    "precision": 1.0,
+    "recall": 0.1320754716981132,
+    "f1": 0.23333333333333334,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.07407407407407407,
+     0.19791666666666666
+    ]
+   },
+   "Procedure": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 93,
+    "precision": 1.0,
+    "recall": 0.010638297872340425,
+    "f1": 0.021052631578947368,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.0,
+     0.04225352112676056
+    ]
+   },
+   "Symptom": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 22,
+    "precision": 1.0,
+    "recall": 0.2413793103448276,
+    "f1": 0.3888888888888889,
+    "precision_ci95": [
+     1.0,
+     1.0
+    ],
+    "recall_ci95": [
+     0.125,
+     0.32
+    ]
+   }
+  },
+  "negation_errors": 0,
+  "subject_errors": 0
+ },
+ "errors": {
+  "missed": [
+   {
+    "text": "sodium fluoride 0.0272 mg mg oral gel",
+    "type": "Medication",
+    "notes": 17
+   },
+   {
+    "text": "gingivitis",
+    "type": "Disease",
+    "notes": 16
+   },
+   {
+    "text": "medication reconciliation",
+    "type": "Procedure",
+    "notes": 10
+   },
+   {
+    "text": "viral sinusitis",
+    "type": "Disease",
+    "notes": 9
+   },
+   {
+    "text": "acute viral pharyngitis",
+    "type": "Disease",
+    "notes": 9
+   },
+   {
+    "text": "gingival disease",
+    "type": "Disease",
+    "notes": 8
+   },
+   {
+    "text": "assessment of health and social care needs",
+    "type": "Procedure",
+    "notes": 8
+   },
+   {
+    "text": "acetaminophen 325 mg oral tablet",
+    "type": "Medication",
+    "notes": 8
+   },
+   {
+    "text": "acute bronchitis",
+    "type": "Disease",
+    "notes": 7
+   },
+   {
+    "text": "patient referral for dental care",
+    "type": "Procedure",
+    "notes": 7
+   },
+   {
+    "text": "otitis media",
+    "type": "Disease",
+    "notes": 6
+   },
+   {
+    "text": "normal pregnancy",
+    "type": "Disease",
+    "notes": 6
+   },
+   {
+    "text": "assessment of substance use",
+    "type": "Procedure",
+    "notes": 6
+   },
+   {
+    "text": "primary dental caries",
+    "type": "Disease",
+    "notes": 6
+   },
+   {
+    "text": "assessment using alcohol use disorders identification test consumption",
+    "type": "Procedure",
+    "notes": 5
+   }
+  ],
+  "false_positives": [
+   {
+    "text": "amoxicillin",
+    "type": "Medication",
+    "notes": 5
+   },
+   {
+    "text": "penicillin",
+    "type": "Medication",
+    "notes": 3
+   },
+   {
+    "text": "insulin",
+    "type": "Medication",
+    "notes": 3
+   },
+   {
+    "text": "lisinopril",
+    "type": "Medication",
+    "notes": 1
+   },
+   {
+    "text": "dialysis",
+    "type": "Procedure",
+    "notes": 1
+   },
+   {
+    "text": "metformin",
+    "type": "Medication",
+    "notes": 1
+   },
+   {
+    "text": "myocardial infarction",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "asthma",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "diabetes",
+    "type": "Disease",
+    "notes": 1
+   },
+   {
+    "text": "albuterol",
+    "type": "Medication",
+    "notes": 1
+   }
+  ]
+ }
+}

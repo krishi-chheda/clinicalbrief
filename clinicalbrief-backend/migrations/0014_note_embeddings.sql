@@ -1,6 +1,7 @@
 -- v1.0.1 (roadmap 8b): note embeddings for "match meaning" search.
 -- Adopted because embedding search beat full-text search on a fixed question set decided in advance
--- (clinicalbrief-backend/eval/results/search-*.json). Vectors come from the LOCAL model (nomic-embed-text, first 512
+-- (clinicalbrief-backend/eval/results/search-*.json; relevance judged by fixed keyword patterns per question, not by
+-- people). Vectors come from the LOCAL model (nomic-embed-text, first 512
 -- dimensions) and are written by `py -3.12 -m app.cli embed-notes`; nothing is sent to an outside service.
 -- ~2 KB per note (35,103 notes: ~75 MB). No vector index: an exact scan is fast at this size and returns exact
 -- neighbours; add an HNSW index if note counts grow by an order of magnitude.

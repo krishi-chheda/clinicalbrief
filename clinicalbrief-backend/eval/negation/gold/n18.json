@@ -1,0 +1,13 @@
+{
+ "note_id": "n18",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "chronic kidney disease",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}

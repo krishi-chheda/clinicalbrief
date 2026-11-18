@@ -6,7 +6,7 @@
 # Clinical data and runtime artefacts - never commit
 clinicalbrief-backend/uploads/
 *.db
-data/
+/data/
 
 # Python
 __pycache__/
@@ -26,3 +26,4 @@ brag-output*/
 clinicalbrief-backend/eval/notes/
 clinicalbrief-backend/eval/search/pg/
 clinicalbrief-backend/eval/search/cache/
+clinicalbrief-backend/eval/review-*.html

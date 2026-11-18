@@ -60,7 +60,7 @@ export default function Governance({ api }: { api: Api }) {
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Governance</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
           Human oversight of AI output. All figures are live counts. Approval rates are the share of human decisions,
-          not a measure of AI accuracy; the extractor has not been evaluated against labelled data.
+          not a measure of AI accuracy. Preliminary extraction scores (synthetic notes, AI-drafted labels) are on the Data page.
         </p>
       </div>
 

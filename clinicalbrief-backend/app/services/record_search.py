@@ -104,15 +104,16 @@ class RecordSearch:
         return q
 
     def _snippet(self, text: str) -> str:
-        """SQLite fallback snippet: ~160 characters around the first match, marked like ts_headline."""
-        low = text.lower()
-        pos = min((low.find(t.lower()) for t in self.terms if low.find(t.lower()) >= 0), default=-1)
-        if pos < 0:
+        """Snippet for SQLite and for meaning-only hits: ~160 characters around the first whole-word match, marked
+        like ts_headline ("ear" must not match inside "year")."""
+        if not self.terms:
             return text[:160]
-        start = max(0, pos - 70)
-        piece = text[start:pos + 90]
-        for t in self.terms:
-            piece = re.sub(re.escape(t), lambda m: f"{MARK_START}{m.group(0)}{MARK_END}", piece, flags=re.I)
+        word = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in sorted(self.terms, key=len, reverse=True)) + r")\b", re.I)
+        m = word.search(text)
+        if not m:
+            return text[:160]
+        start = max(0, m.start() - 70)
+        piece = word.sub(lambda m: f"{MARK_START}{m.group(0)}{MARK_END}", text[start:m.start() + 90])
         return ("..." if start else "") + piece + "..."
 
     # --- per kind --------------------------------------------------------------------------------------

@@ -1,0 +1,31 @@
+{
+ "note_id": "n04",
+ "labelled_by": "ai-draft (Claude Opus 5.5): notes and labels written together to exercise negation, uncertainty and family history",
+ "reviewed_by": null,
+ "mentions": [
+  {
+   "text": "penicillin",
+   "type": "Allergy",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "rash",
+   "type": "Symptom",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "pneumonia",
+   "type": "Disease",
+   "negated": false,
+   "subject": "patient"
+  },
+  {
+   "text": "azithromycin",
+   "type": "Medication",
+   "negated": false,
+   "subject": "patient"
+  }
+ ]
+}
